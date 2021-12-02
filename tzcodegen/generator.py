@@ -13,6 +13,7 @@ from .initialization import _set_parser, _set_logging
 
 def __run(args):
 
+    module_name = os.path.basename(os.path.normpath(args.input))
     out_include = os.path.join(args.output, "include")
     os.mkdir(out_include)
     _copy(conf.STUB_PTA_H, out_include)
@@ -58,13 +59,13 @@ def __run(args):
     with open(os.path.join(args.output, conf.STUB_SUB_MK), "r") as f:
         content = f.read()
     
-    content = content.replace("{module_name}", args.input+".c")   
+    content = content.replace("{module_name}", module_name+".c")   
     
     with open(os.path.join(args.output, conf.STUB_SUB_MK), "w") as f:
         f.write(content)
     
     #---------------------------module----------------------------------------------
-    out_src = os.path.join(args.output, args.input+".c")
+    out_src = os.path.join(args.output, module_name+".c")
 
     # In this section, we update TA:
     # - parse the annotations (inputs, outputs, entry points)
@@ -77,17 +78,17 @@ def __run(args):
         import_str = f.read()
 
     # write new content
-    new_content = import_str + "\n" + "#include " + "<"+ args.input + ".h>\n" + content
+    new_content = import_str + "\n" + "#include " + "<"+ module_name + ".h>\n" + content
     with open(out_src, "w") as f:
         f.write(new_content)
     #------------------creating ta.h file--------------------------------------
     with open(os.path.join(conf.STUBS_FOLDER, conf.STUB_TA_H), "r") as f:
         ta_h = f.read()
 
-    with open(os.path.join(out_include, args.input + ".h"), "w") as f:
+    with open(os.path.join(out_include, module_name + ".h"), "w") as f:
         f.write(ta_h)
     
-    add_io_declarations(os.path.join(out_include, args.input + ".h"), data)
+    add_io_declarations(os.path.join(out_include, module_name + ".h"), data)
     #------------------------------------------------------------------
     ## Authentic Execution file ##
     # In this section, we add to the project all the needed for authentic execution
@@ -97,7 +98,7 @@ def __run(args):
     with open(os.path.join(conf.STUBS_FOLDER, conf.STUB_AUTH_EXEC), "r") as f:
         auth_exec = f.read()
 
-    auth_exec = auth_exec.replace("{header_file}", "<" + args.input + ".h>")
+    auth_exec = auth_exec.replace("{header_file}", "<" + module_name + ".h>")
 
     with open(os.path.join(args.output, conf.STUB_AUTH_EXEC), "w") as f:
         f.write(auth_exec)

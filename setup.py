@@ -7,14 +7,12 @@ with open("requirements.txt", "r") as f:
     requirements = f.readlines()
 
 setuptools.setup(
-    name="rust-sgx-gen",
-    version="0.2.2",
-    author="Gianluca Scopelliti",
-    author_email="gianlu.1033@gmail.com",
-    description="Rust code generator for the Authentic Execution framework",
+    name="TZ-Code-Gen",
+    version="0.0.0",
+    author="Sepideh pouyanrad",
+    description="Trustzone module code generator for the Authentic Execution framework",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/AuthenticExecution/rust-sgx-gen",
     packages=setuptools.find_packages(),
     install_requires=requirements,
     classifiers=[
@@ -24,7 +22,7 @@ setuptools.setup(
     ],
     python_requires='>=3.6',
     entry_points={
-        'console_scripts': ['rust-sgx-gen = rustsgxgen.generator:__main']
+        'console_scripts': ['TZ-Code-Gen = tzcodegen.generator:__main']
     },
     include_package_data=True,
 )
