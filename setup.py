@@ -7,9 +7,9 @@ with open("requirements.txt", "r") as f:
     requirements = f.readlines()
 
 setuptools.setup(
-    name="TZ-Code-Gen",
-    version="0.0.0",
-    author="Sepideh pouyanrad",
+    name="tz-codegen",
+    version="0.1.0",
+    author="Sepideh Pouyanrad",
     description="Trustzone module code generator for the Authentic Execution framework",
     long_description=long_description,
     long_description_content_type="text/markdown",

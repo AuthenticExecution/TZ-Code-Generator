@@ -15,7 +15,7 @@ def _set_parser():
                         type=__input_dir, help='Input folder of the software module')
     parser.add_argument('-o', '--output', required=True,
                         type=__output_dir, help='Output folder of the software module')
-    
+
     return parser
 
 
@@ -70,4 +70,5 @@ def __input_dir(arg):
 def __output_dir(arg):
     if not os.path.exists(arg):
         return arg
-    raise argparse.ArgumentTypeError("Output dir {} already exists".format(arg))
+    raise argparse.ArgumentTypeError(
+        "Output dir {} already exists".format(arg))

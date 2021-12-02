@@ -30,8 +30,10 @@ START_INPUT_INDEX = 0
 START_OUTPUT_INDEX = 16384
 
 OUTPUT_PATTERN = '^[ \t]*SM_OUTPUT[ \t]*\([ \t]*([a-zA-Z_][a-zA-Z_0-9]*)[ \t]*\)[ \t]*;[ \t]*$'
-INPUT_PATTERN = '^[ \t]*SM_INPUT[ \t]*\([ \t]*([a-zA-Z_][a-zA-Z_0-9]*)[ \t]*,[ \t]*[a-zA-Z_][a-zA-Z_0-9]*[ \t]*,[ \t]*[a-zA-Z_][a-zA-Z_0-9]*[ \t]*\)'
-ENTRY_PATTERN = '^[ \t]*SM_ENTRY[ \t]*\([ \t]*([a-zA-Z_][a-zA-Z_0-9]*)[ \t]*,[ \t]*[a-zA-Z_][a-zA-Z_0-9]*[ \t]*,[ \t]*[a-zA-Z_][a-zA-Z_0-9]*[ \t]*\)'
+INPUT_PATTERN = ('^[ \t]*SM_INPUT[ \t]*\([ \t]*([a-zA-Z_][a-zA-Z_0-9]*)[ \t]*,'
+                 '[ \t]*[a-zA-Z_][a-zA-Z_0-9]*[ \t]*,[ \t]*[a-zA-Z_][a-zA-Z_0-9]*[ \t]*\)')
+ENTRY_PATTERN = ('^[ \t]*SM_ENTRY[ \t]*\([ \t]*([a-zA-Z_][a-zA-Z_0-9]*)[ \t]*,'
+                 '[ \t]*[a-zA-Z_][a-zA-Z_0-9]*[ \t]*,[ \t]*[a-zA-Z_][a-zA-Z_0-9]*[ \t]*\)')
 OUTPUT_REPL = "SM_OUTPUT_AUX(\\1, {});"
-IO_SIGNATURE = "void {}(void *session, uint32_t param_types, TEE_Param params[4],unsigned char *data, uint32_t len);\n"
-
+IO_SIGNATURE = ("void {}(void *session, uint32_t param_types, TEE_Param params[4],"
+                "unsigned char *data, uint32_t len);\n")

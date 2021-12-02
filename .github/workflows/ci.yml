@@ -1,0 +1,25 @@
+name: Pypi
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch: # Allow manual triggering
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    -
+      uses: actions/checkout@master
+    -
+      name: code-check
+      run: |
+        sudo apt update && sudo apt install pylint
+        cd ..
+        pylint TZ-Code-Generator --rcfile TZ-Code-Generator/.pylintrc
+    -
+      name: publish
+      if: ${{ github.event_name != 'pull_request' }}
+      run: make upload PYPI_PASSWORD=${{ secrets.PYPI_TOKEN }}
