@@ -23,22 +23,10 @@ def __run(args):
     # -------------------------------user_ta_header_defines-------------------------------
     _copy(conf.STUB_USER_TA_HEADER_DEFINES, args.output)
     u = uuid.uuid4()
-    print(u)
-    print(u.int)
     int_uuid = u.int
-    hex_ = '%032x' % int_uuid
-    str_uuid = '%s-%s-%s-%s-%s' % (hex_[:8],
-                                   hex_[8:12], hex_[12:16], hex_[16:20], hex_[20:])
-    print(str_uuid)
+    
     n = [', 0x'] * 11
-    n[::2] = ['{:12x}'.format(u.node)[i:i + 2] for i in range(0, 12, 2)]
-    print('\n' + '#define TA_UUID\n\t{ ' +
-          '0x{:08x}'.format(u.time_low) + ', ' +
-          '0x{:04x}'.format(u.time_mid) + ', ' +
-          '0x{:04x}'.format(u.time_hi_version) + ', \\ \n\n\t\t{ ' +
-          '0x{:02x}'.format(u.clock_seq_hi_variant) + ', ' +
-          '0x{:02x}'.format(u.clock_seq_low) + ', ' +
-          '0x' + ''.join(n) + '} }')
+    n[::2] = ['{:012x}'.format(u.node)[i:i + 2] for i in range(0, 12, 2)]
 
     inject_uuid = "\t{ " + "0x{:08x}".format(u.time_low) + ", " \
         + "0x{:04x}".format(u.time_mid) + ", " + "0x{:04x}".format(u.time_hi_version) \

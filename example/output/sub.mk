@@ -1,5 +1,5 @@
 global-incdirs-y += include
-srcs-y += button_driver.c
+srcs-y += led_driver.c
 srcs-y += spongent.c
 srcs-y += authentic_execution.c
 

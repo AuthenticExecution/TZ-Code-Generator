@@ -3,26 +3,28 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+
 #include <tee_internal_api.h>
 
 #include <authentic_execution.h>
 #include <pta_attestation.h>
 #include <spongent.h>
 
-#include <button_driver.h>
+#include <led_driver.h>
+
+#define NUM_INPUTS 1
+#define NUM_ENTRIES 0
+#define ENTRY_START_INDEX 3
 
 // I define a new type `input_t` for input functions
 typedef void (*input_t)(void *, uint32_t, TEE_Param *, unsigned char *, uint32_t);
-
-// this is the array that will contain the inputs
-input_t input_funcs[0] = {  };
-
-// ------------------------------------------------------
 typedef void (*entry_t)(void *, uint32_t, TEE_Param *, unsigned char *, uint32_t);
 
-input_t entry_funcs[1] = { entry1 };
+// this is the array that will contain the inputs
+input_t input_funcs[NUM_INPUTS] = { toggle_led };
+entry_t entry_funcs[NUM_ENTRIES] = {  };
+// ------------------------------------------------------
 
-//------------------------------------------------------------
 static const TEE_UUID pta_attestation_uuid = ATTESTATION_UUID;
 
 void *malloc_aligned(size_t size) {
@@ -457,8 +459,6 @@ void handle_output(void *session, uint32_t output_id, uint32_t param_types,
 	BitSequence data_spongent[data_len];
 	memcpy(data_spongent, data, data_len); // for spongent
 
-	TEE_Time t = { };
-
 	uint8_t index = 0;
 
 	int arr[total_node];
@@ -500,20 +500,11 @@ void handle_output(void *session, uint32_t output_id, uint32_t param_types,
 			encrypt = TEE_Malloc(data_len, 0);
 			tag_void = TEE_Malloc(16, 0);
 
-			TEE_GetREETime(&t);
-			printf("\n");
-			printf("time before AES encryption in handle_output(button_driver): %u.%03u\n", 
-							(unsigned int)t.seconds, (unsigned int)t.millis);
-			
 			TEE_Result res = TEE_AEEncryptFinal(sess->op_handle, text, data_len,
 					encrypt, &data_len, tag_void, &sz);
 
 			if (!res) {
-				printf("\n");
-				TEE_GetREETime(&t);
-				printf("time after AES encryption in handle_output(button_driver): %u.%03u\n", 
-							(unsigned int)t.seconds, (unsigned int)t.millis);
-				printf("\n");
+				
 				data[index] = data_len & 0xFF;
 				memcpy(data + index + 1, encrypt, data_len);//^^^^^^^^^^^^^^^^
 				memcpy(tag + (16 * i), tag_void, 16);//^^^^^^^^^^^^^^^^^^^^^
@@ -522,19 +513,9 @@ void handle_output(void *session, uint32_t output_id, uint32_t param_types,
 			}
 		} // if AES 
 		else {
-			printf("\n");
-			TEE_GetREETime(&t);
-			printf("time before SPONGENT encryption in handle_output(button_driver): %u.%03u\n", 
-							(unsigned int)t.seconds, (unsigned int)t.millis);
-
+			
 			SpongentWrap(connection->connection_key, aad, 16, data_spongent, data_len * 8, output, tag_spongent, 0);
 			
-			printf("\n");
-			TEE_GetREETime(&t);
-			printf("time after SPONGENT encryption in handle_output(button_driver): %u.%03u\n", 
-							(unsigned int)t.seconds, (unsigned int)t.millis);
-			printf("\n");
-
 			data[index] = data_len & 0xFF;
 			memcpy(data + index + 1, output, data_len);//^^^^^^^^^^^^^^^^^^^^^
 			memcpy(tag + (16 * i), tag_spongent, 16);//^^^^^^^^^^^^^^^^^^^^^^
@@ -570,7 +551,7 @@ TEE_Result handle_input(void *session, uint32_t param_types, TEE_Param params[4]
 	TEE_Result res;
 	struct aes_cipher *sess;
 	sess = (struct aes_cipher *)session;
-	TEE_Time t = { };
+
 	uint32_t size = params[0].value.a;
 	unsigned char* data;
 	data = malloc(size);
@@ -601,25 +582,14 @@ TEE_Result handle_input(void *session, uint32_t param_types, TEE_Param params[4]
     	tag_void = TEE_Malloc(16, 0);
 
 		TEE_MemMove(tag_void, params[3].memref.buffer, 16);
-		
-		printf("\n");
-		TEE_GetREETime(&t);
-		printf("time before AES decryption in handle_input(button_driver): %u.%03u\n", 
-							(unsigned int)t.seconds, (unsigned int)t.millis);
 
 		res = TEE_AEDecryptFinal(sess->op_handle, params[2].memref.buffer, size,
 						decrypted_data, &size, tag_void, 16);
 
 		if (!res) {
-			printf("\n");
-			TEE_GetREETime(&t);
-			printf("time after AES decryption in handle_input(button_driver): %u.%03u\n", 
-							(unsigned int)t.seconds, (unsigned int)t.millis);
+		
       		memcpy(data, decrypted_data, size);
-	  		for(int i = 0; i < size; i++){
-		  		printf("%2X", data[i]);
-	  		}
-			printf("\n");
+	  	
 	  		TEE_Free(decrypted_data);
 	  		TEE_Free(tag_void);
 		}
@@ -637,31 +607,24 @@ TEE_Result handle_input(void *session, uint32_t param_types, TEE_Param params[4]
 			tag_spongent[n] = ((uint8_t *)params[3].memref.buffer)[n];
 		}
 
-		printf("\n");
-		TEE_GetREETime(&t);
-		printf("time before SPONGENT decryption in handle_input(button_driver): %u.%03u\n", 
-							(unsigned int)t.seconds, (unsigned int)t.millis);
 		SpongentUnwrap(connection->connection_key, aad, 16, encrypted_data,
 															size * 8, data, tag_spongent);
 
-		printf("\n");
-		TEE_GetREETime(&t);
-		printf("time after SPONGENT decryption in handle_input(button_driver): %u.%03u\n", 
-							(unsigned int)t.seconds, (unsigned int)t.millis);
-		
-		for(int i = 0; i < size; i++){
-			printf("%2X", data[i]);
-	  	}
-		printf("\n");
 
 	}// if spongent
 
 	connection->nonce = connection->nonce + 1;
 	params[0].value.a = 0;
 	params[0].value.b = 0;
-	printf("Calling input with ID %d\n", connection->io_id);
-    input_funcs[connection->io_id](session, param_types, params, data, size);
 	
+	if(connection->io_id >= 0 && connection->io_id < NUM_INPUTS) {
+		input_funcs[connection->io_id](session, param_types, params, data, size);
+	}
+	else{
+		DMSG("Not Valid Input Index");
+		return TEE_ERROR_OVERFLOW;
+	}
+
 	return TEE_SUCCESS;
 }
 //-----------------------------------------------------------------------
@@ -682,8 +645,15 @@ TEE_Result handle_entry(void *session, uint32_t param_types, TEE_Param params[4]
 
 	params[0].value.a = 0;
 	params[0].value.b = 0;
-	printf("Calling entry with ID %d\n", entry_id);
-    entry_funcs[entry_id - 3](session, param_types, params, data_input, size);
+	
+	if(entry_id - ENTRY_START_INDEX >= 0 && entry_id - ENTRY_START_INDEX < NUM_ENTRIES) {
+
+		entry_funcs[entry_id - ENTRY_START_INDEX](session, param_types, params, data_input, size);
+	}
+	else{
+		DMSG("Not Valid Entry Index");
+		return TEE_ERROR_OVERFLOW;
+	}
 
 	return TEE_SUCCESS;
 }
