@@ -26,11 +26,8 @@ def _parse_annotations(file):
     data = {}
 
     data["inputs"] = __parse_inputs(content)
-    print(type(data["inputs"]), data["inputs"])
     data["entrypoints"] = __parse_entrypoints(content)
-    print(data["entrypoints"])
     content, data["outputs"] = __parse_outputs(content)
-    print(data["outputs"])
 
     return content, data
 
@@ -40,8 +37,6 @@ def __parse_outputs(input_file):
     # check how many outputs have been declared in the input file
     p = re.compile(conf.OUTPUT_PATTERN, re.MULTILINE | re.ASCII)
     outputs_name = list(p.findall(input_file))
-    print("Found outputs: {}".format(outputs_name))
-    print(type(outputs_name))
 
     num_outputs = len(outputs_name)
 
