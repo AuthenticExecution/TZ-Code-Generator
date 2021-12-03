@@ -10,10 +10,10 @@
 #include <pta_attestation.h>
 #include <spongent.h>
 
-#include {header_file}
+#include <led_driver.h>
 
-#define NUM_INPUTS {num_inputs}
-#define NUM_ENTRIES {num_entrys}
+#define NUM_INPUTS 1
+#define NUM_ENTRIES 0
 #define ENTRY_START_INDEX 3
 
 // I define a new type `input_t` for input functions
@@ -21,8 +21,8 @@ typedef void (*input_t)(void *, uint32_t, TEE_Param *, unsigned char *, uint32_t
 typedef void (*entry_t)(void *, uint32_t, TEE_Param *, unsigned char *, uint32_t);
 
 // this is the array that will contain the inputs
-input_t input_funcs[NUM_INPUTS] = { {fill_inputs} };
-entry_t entry_funcs[NUM_ENTRIES] = { {fill_entrys} };
+input_t input_funcs[NUM_INPUTS] = { toggle_led };
+entry_t entry_funcs[NUM_ENTRIES] = {  };
 // ------------------------------------------------------
 
 static const TEE_UUID pta_attestation_uuid = ATTESTATION_UUID;
