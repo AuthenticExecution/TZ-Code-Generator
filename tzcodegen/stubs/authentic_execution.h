@@ -27,7 +27,7 @@
 TEE_Result handle_input(void *session, uint32_t param_types, TEE_Param params[4]);
 
 void handle_output(void *session, uint32_t output_id, uint32_t param_types,
-                   TEE_Param params[4], unsigned char *data_input uint32_t data_len);
+                   TEE_Param params[4], unsigned char *data_input, uint32_t data_len);
 
 //------------------------------------------------------------------------------
 
