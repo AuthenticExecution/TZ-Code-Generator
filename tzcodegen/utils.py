@@ -129,3 +129,7 @@ def _copy(src, des):
 
     with open(os.path.join(des, src), "w") as f:
         f.write(content)
+
+def _mkdir(path):
+    if not os.path.exists(path):
+        os.mkdir(path)

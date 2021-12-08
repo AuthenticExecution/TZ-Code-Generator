@@ -4,7 +4,7 @@ import sys
 import uuid
 
 from . import conf
-from .utils import _parse_annotations, _prepare_output_dir, _copy, \
+from .utils import _parse_annotations, _prepare_output_dir, _copy, _mkdir, \
     add_io_declarations, fill_input_array
 from .initialization import _set_parser, _set_logging
 
@@ -13,7 +13,7 @@ def __run(args):
 
     module_name = os.path.basename(os.path.normpath(args.input))
     out_include = os.path.join(args.output, "include")
-    os.mkdir(out_include)
+    _mkdir(out_include)
     _copy(conf.STUB_PTA_H, out_include)
     _copy(conf.STUB_SPONGENT_H, out_include)
     _copy(conf.STUB_AE_H, out_include)
