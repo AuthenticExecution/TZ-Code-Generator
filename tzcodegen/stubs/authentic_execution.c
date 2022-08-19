@@ -378,7 +378,7 @@ static TEE_Result exit_module(void *session, uint32_t param_types,
 {
 	// TODO implement this function to exit the module
 	delete_all_connections();
-	return TEE_SUCCESS
+	return TEE_SUCCESS;
 }
 
 //======================================================================
