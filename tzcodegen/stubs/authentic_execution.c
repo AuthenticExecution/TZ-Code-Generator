@@ -14,7 +14,7 @@
 
 #define NUM_INPUTS {num_inputs}
 #define NUM_ENTRIES {num_entrys}
-#define ENTRY_START_INDEX 3
+#define ENTRY_START_INDEX 4
 
 // I define a new type `input_t` for input functions
 typedef void (*input_t)(void *, uint32_t, TEE_Param *, unsigned char *, uint32_t);
@@ -95,6 +95,19 @@ void find_connections(uint16_t io_id, int *arr, uint8_t *num)
         current = current->next;
     }
 
+}
+
+void delete_all_connections() {
+	Node* old = NULL;
+	Node* current = connections_head;
+
+    while (current != NULL) {
+		old = current;
+		current = current->next;
+        free(old);
+    }
+
+	connections_head = NULL;
 }
 
 //===============================================================
@@ -358,6 +371,14 @@ out:
     TEE_Free(tag_void);
 
 	return res;
+}
+
+static TEE_Result exit_module(void *session, uint32_t param_types,
+				TEE_Param params[4])
+{
+	// TODO implement this function to exit the module
+	delete_all_connections();
+	return TEE_SUCCESS
 }
 
 //======================================================================
@@ -712,6 +733,8 @@ TEE_Result TA_InvokeCommandEntryPoint(void *session, uint32_t cmd, uint32_t para
 		return set_key(session, param_types, params);
 	case ATTEST:
 		return attest(session, param_types, params);
+	case EXIT:
+		return exit_module(session, param_types, params);
 	case HANDLE_INPUT:
 		return handle_input(session, param_types, params);
 	case ENTRY:

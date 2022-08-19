@@ -20,8 +20,9 @@
 /* The function IDs implemented in this TA */
 #define SET_KEY                               0
 #define ATTEST                                1
-#define HANDLE_INPUT                          2
-#define ENTRY                                 3
+#define EXIT                                  2
+#define HANDLE_INPUT                          3
+#define ENTRY                                 4
 
 
 TEE_Result handle_input(void *session, uint32_t param_types, TEE_Param params[4]);
