@@ -733,7 +733,7 @@ TEE_Result TA_InvokeCommandEntryPoint(void *session, uint32_t cmd, uint32_t para
 		return set_key(session, param_types, params);
 	case ATTEST:
 		return attest(session, param_types, params);
-	case EXIT:
+	case EXIT_MODULE:
 		return exit_module(session, param_types, params);
 	case HANDLE_INPUT:
 		return handle_input(session, param_types, params);
