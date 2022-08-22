@@ -82,6 +82,22 @@ Connection* connections_get(uint16_t conn_id)
     return NULL;
 }
 
+int connections_replace(Connection* connection)
+{
+    Node* current = connections_head;
+
+    while (current != NULL) {
+        if (connection->conn_id == current->connection.conn_id) {
+            current->connection = *connection;
+            return 1;
+        }
+
+        current = current->next;
+    }
+
+    return 0;
+}
+
 void find_connections(uint16_t io_id, int *arr, uint8_t *num)
 {
     Node* current = connections_head;
@@ -362,8 +378,12 @@ static TEE_Result set_key(void *session, uint32_t param_types,
          connection.io_id = connection.io_id + (( tag[n] & 0xFF ) << (8*j));
          ++j;
       }
-	  total_node = total_node + 1;
-      connections_add(&connection);
+
+	  // replace if existing
+	  if(!connections_replace(&connection)) {
+		total_node = total_node + 1;
+		connections_add(&connection);
+	  }
     }
 
 out:
