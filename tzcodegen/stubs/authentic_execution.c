@@ -377,6 +377,10 @@ static TEE_Result exit_module(void *session, uint32_t param_types,
 				TEE_Param params[4])
 {
 	// TODO implement this function to exit the module
+	//		also decrypt the input to see if it's correct
+	//		first parameter: nonce (check that it's the latest)
+	//		second parameter: MAC over the nonce with the module key
+	DMSG("Disabling module");
 	delete_all_connections();
 	return TEE_SUCCESS;
 }
@@ -578,6 +582,7 @@ TEE_Result handle_input(void *session, uint32_t param_types, TEE_Param params[4]
 	data = malloc(size);
 
 	Connection* connection = connections_get(params[0].value.b);
+	if(connection == NULL) return TEE_ERROR_BAD_PARAMETERS;
 
 	char nonce[12] = { 0 };
     size_t nonce_sz = 12;
