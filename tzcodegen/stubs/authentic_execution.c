@@ -354,8 +354,8 @@ static TEE_Result set_key(void *session, uint32_t param_types,
 	TEE_MemMove(tag_void, params[2].memref.buffer, params[2].memref.size);
 
 	res = TEE_AEDecryptFinal(sess->op_handle, params[1].memref.buffer,
-				 params[1].memref.size, decrypted_key, params[2].memref.size, tag_void,
-				 params[2].memref.size);
+				 params[1].memref.size, decrypted_key, &params[2].memref.size, 
+				 tag_void, params[2].memref.size);
 
 	if (!res) {
       temp = decrypted_key;
@@ -429,8 +429,8 @@ static TEE_Result disable(void *session, uint32_t param_types,
 	TEE_MemMove(tag_void, params[2].memref.buffer, params[2].memref.size);
 
 	res = TEE_AEDecryptFinal(sess->op_handle, params[1].memref.buffer,
-				 params[1].memref.size, decrypted_nonce, 2, tag_void,
-				 params[2].memref.size);
+				 params[1].memref.size, decrypted_nonce, &params[2].memref.size, 
+				 tag_void, params[2].memref.size);
 
 	if (!res) {
 		delete_all_connections();
