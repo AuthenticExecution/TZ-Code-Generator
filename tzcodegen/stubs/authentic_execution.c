@@ -393,11 +393,10 @@ out:
 	return res;
 }
 
-static TEE_Result exit_module(void *session, uint32_t param_types,
+static TEE_Result disable(void *session, uint32_t param_types,
 				TEE_Param params[4])
 {
-	// TODO implement this function to exit the module
-	//		also decrypt the input to see if it's correct
+	// TODO decrypt the input to see if it's correct
 	//		first parameter: nonce (check that it's the latest)
 	//		second parameter: MAC over the nonce with the module key
 	DMSG("Disabling module");
@@ -758,8 +757,8 @@ TEE_Result TA_InvokeCommandEntryPoint(void *session, uint32_t cmd, uint32_t para
 		return set_key(session, param_types, params);
 	case ATTEST:
 		return attest(session, param_types, params);
-	case EXIT_MODULE:
-		return exit_module(session, param_types, params);
+	case DISABLE:
+		return disable(session, param_types, params);
 	case HANDLE_INPUT:
 		return handle_input(session, param_types, params);
 	case ENTRY:

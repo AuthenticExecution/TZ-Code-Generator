@@ -20,7 +20,7 @@
 /* The function IDs implemented in this TA */
 #define SET_KEY                               0
 #define ATTEST                                1
-#define EXIT_MODULE                           2
+#define DISABLE                               2
 #define HANDLE_INPUT                          3
 #define ENTRY                                 4
 
