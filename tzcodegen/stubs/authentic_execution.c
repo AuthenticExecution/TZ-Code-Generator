@@ -354,7 +354,7 @@ static TEE_Result set_key(void *session, uint32_t param_types,
 	TEE_MemMove(tag_void, params[2].memref.buffer, params[2].memref.size);
 
 	res = TEE_AEDecryptFinal(sess->op_handle, params[1].memref.buffer,
-				 params[1].memref.size, decrypted_key, &params[2].memref.size, tag_void,
+				 params[1].memref.size, decrypted_key, params[2].memref.size, tag_void,
 				 params[2].memref.size);
 
 	if (!res) {
@@ -396,12 +396,51 @@ out:
 static TEE_Result disable(void *session, uint32_t param_types,
 				TEE_Param params[4])
 {
-	// TODO decrypt the input to see if it's correct
-	//		first parameter: nonce (check that it's the latest)
-	//		second parameter: MAC over the nonce with the module key
 	DMSG("Disabling module");
-	delete_all_connections();
-	return TEE_SUCCESS;
+	TEE_Result res = TEE_ERROR_OUT_OF_MEMORY;
+	const uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+				TEE_PARAM_TYPE_MEMREF_INPUT,
+				TEE_PARAM_TYPE_MEMREF_INPUT,
+				TEE_PARAM_TYPE_NONE);
+	struct aes_cipher *sess;
+    Connection connection;
+
+	sess = (struct aes_cipher *)session;
+    char nonce[12] = { 0 };
+    size_t nonce_sz = 12;
+
+    alloc_resources(sess, TA_AES_ALGO_GCM, 16, TA_AES_MODE_DECODE);
+    set_aes_key(sess, module_key, 16);
+    reset_aes_iv(sess, params[0].memref.buffer, params[0].memref.size, nonce, nonce_sz, params[1].memref.size);
+
+    char *tag;
+    tag = params[0].memref.buffer;
+    char *temp;
+
+    void *decrypted_nonce = NULL;
+    void *tag_void = NULL;
+
+   //==========================================
+    decrypted_nonce = TEE_Malloc(2, 0);
+    tag_void = TEE_Malloc(params[2].memref.size, 0);
+	if (!decrypted_nonce || !tag_void)
+		goto out;
+
+	TEE_MemMove(tag_void, params[2].memref.buffer, params[2].memref.size);
+
+	res = TEE_AEDecryptFinal(sess->op_handle, params[1].memref.buffer,
+				 params[1].memref.size, decrypted_nonce, 2, tag_void,
+				 params[2].memref.size);
+
+	if (!res) {
+		delete_all_connections();
+    }
+
+out:
+	TEE_Free(decrypted_nonce);
+    TEE_Free(tag_void);
+
+	return res;
 }
 
 //======================================================================
