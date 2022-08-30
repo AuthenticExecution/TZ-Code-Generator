@@ -478,17 +478,18 @@ static TEE_Result attest(void *session, uint32_t param_types,
 	// ------------ Open Session to PTA ---------
 	res = TEE_OpenTASession(&pta_attestation_uuid, 0, 0, NULL, &pta_session,
 				&ret_origin);
+
+	if (res == TEE_SUCCESS) {
+		// ------------ Invoke command at PTA (get_module key) ---------
+		res = TEE_InvokeTACommand(pta_session, 0, ATTESTATION_CMD_GET_MODULE_KEY,
+										pta_param_types, pta_params, &ret_origin);
+
+		// ------------ Close Session to PTA ---------
+		TEE_CloseTASession(pta_session);
+	}
+
 	if (res != TEE_SUCCESS)
 		return res;
-
-	// ------------ Invoke command at PTA (get_module key) ---------
-	res = TEE_InvokeTACommand(pta_session, 0, ATTESTATION_CMD_GET_MODULE_KEY,
-								pta_param_types, pta_params, &ret_origin);
-	if (res != TEE_SUCCESS)
-		return res;
-
-	// ------------ Close Session to PTA ---------
-	TEE_CloseTASession(pta_session);
 
 	//*******************************************************************************
     char nonce[12] = { 0 };
