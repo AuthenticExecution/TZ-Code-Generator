@@ -10,19 +10,20 @@
 #include <pta_attestation.h>
 #include <spongent.h>
 
-#include <led_driver.h>
+#include <button_driver.h>
 
-#define NUM_INPUTS 1
-#define NUM_ENTRIES 0
-#define ENTRY_START_INDEX 3
+#define VENDOR_ID 817
+#define NUM_INPUTS 0
+#define NUM_ENTRIES 1
+#define ENTRY_START_INDEX 4
 
 // I define a new type `input_t` for input functions
 typedef void (*input_t)(void *, uint32_t, TEE_Param *, unsigned char *, uint32_t);
 typedef void (*entry_t)(void *, uint32_t, TEE_Param *, unsigned char *, uint32_t);
 
 // this is the array that will contain the inputs
-input_t input_funcs[NUM_INPUTS] = { toggle_led };
-entry_t entry_funcs[NUM_ENTRIES] = {  };
+input_t input_funcs[NUM_INPUTS] = {  };
+entry_t entry_funcs[NUM_ENTRIES] = { entry1 };
 // ------------------------------------------------------
 
 static const TEE_UUID pta_attestation_uuid = ATTESTATION_UUID;
@@ -82,6 +83,22 @@ Connection* connections_get(uint16_t conn_id)
     return NULL;
 }
 
+int connections_replace(Connection* connection)
+{
+    Node* current = connections_head;
+
+    while (current != NULL) {
+        if (connection->conn_id == current->connection.conn_id) {
+            current->connection = *connection;
+            return 1;
+        }
+
+        current = current->next;
+    }
+
+    return 0;
+}
+
 void find_connections(uint16_t io_id, int *arr, uint8_t *num)
 {
     Node* current = connections_head;
@@ -95,6 +112,19 @@ void find_connections(uint16_t io_id, int *arr, uint8_t *num)
         current = current->next;
     }
 
+}
+
+void delete_all_connections() {
+	Node* old = NULL;
+	Node* current = connections_head;
+
+    while (current != NULL) {
+		old = current;
+		current = current->next;
+        free(old);
+    }
+
+	connections_head = NULL;
 }
 
 //===============================================================
@@ -325,8 +355,8 @@ static TEE_Result set_key(void *session, uint32_t param_types,
 	TEE_MemMove(tag_void, params[2].memref.buffer, params[2].memref.size);
 
 	res = TEE_AEDecryptFinal(sess->op_handle, params[1].memref.buffer,
-				 params[1].memref.size, decrypted_key, &params[2].memref.size, tag_void,
-				 params[2].memref.size);
+				 params[1].memref.size, decrypted_key, &params[2].memref.size, 
+				 tag_void, params[2].memref.size);
 
 	if (!res) {
       temp = decrypted_key;
@@ -349,12 +379,66 @@ static TEE_Result set_key(void *session, uint32_t param_types,
          connection.io_id = connection.io_id + (( tag[n] & 0xFF ) << (8*j));
          ++j;
       }
-	  total_node = total_node + 1;
-      connections_add(&connection);
+
+	  // replace if existing
+	  if(!connections_replace(&connection)) {
+		total_node = total_node + 1;
+		connections_add(&connection);
+	  }
     }
 
 out:
 	TEE_Free(decrypted_key);
+    TEE_Free(tag_void);
+
+	return res;
+}
+
+static TEE_Result disable(void *session, uint32_t param_types,
+				TEE_Param params[4])
+{
+	DMSG("Disabling module");
+	TEE_Result res = TEE_ERROR_OUT_OF_MEMORY;
+	const uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+				TEE_PARAM_TYPE_MEMREF_INPUT,
+				TEE_PARAM_TYPE_MEMREF_INPUT,
+				TEE_PARAM_TYPE_NONE);
+	struct aes_cipher *sess;
+    Connection connection;
+
+	sess = (struct aes_cipher *)session;
+    char nonce[12] = { 0 };
+    size_t nonce_sz = 12;
+
+    alloc_resources(sess, TA_AES_ALGO_GCM, 16, TA_AES_MODE_DECODE);
+    set_aes_key(sess, module_key, 16);
+    reset_aes_iv(sess, params[0].memref.buffer, params[0].memref.size, nonce, nonce_sz, params[1].memref.size);
+
+    char *tag;
+    tag = params[0].memref.buffer;
+    char *temp;
+
+    void *decrypted_nonce = NULL;
+    void *tag_void = NULL;
+
+   //==========================================
+    decrypted_nonce = TEE_Malloc(2, 0);
+    tag_void = TEE_Malloc(params[2].memref.size, 0);
+	if (!decrypted_nonce || !tag_void)
+		goto out;
+
+	TEE_MemMove(tag_void, params[2].memref.buffer, params[2].memref.size);
+
+	res = TEE_AEDecryptFinal(sess->op_handle, params[1].memref.buffer,
+				 params[1].memref.size, decrypted_nonce, &params[2].memref.size, 
+				 tag_void, params[2].memref.size);
+
+	if (!res) {
+		delete_all_connections();
+    }
+
+out:
+	TEE_Free(decrypted_nonce);
     TEE_Free(tag_void);
 
 	return res;
@@ -377,15 +461,19 @@ static TEE_Result attest(void *session, uint32_t param_types,
 	// ------------ Call PTA ---------**************************************************
 	TEE_TASessionHandle pta_session = TEE_HANDLE_NULL;
 	uint32_t ret_origin = 0;
-	uint32_t pta_param_types = TEE_PARAM_TYPES( TEE_PARAM_TYPE_MEMREF_OUTPUT,
-											TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
+	uint32_t pta_param_types = TEE_PARAM_TYPES( TEE_PARAM_TYPE_MEMREF_INPUT,
+											TEE_PARAM_TYPE_MEMREF_OUTPUT, 
+											TEE_PARAM_TYPE_NONE,
 											TEE_PARAM_TYPE_NONE);
 
 	TEE_Param pta_params[TEE_NUM_PARAMS];
 
 	// prepare the parameters for the pta
-	pta_params[0].memref.buffer = module_key;
-	pta_params[0].memref.size = 16;
+	uint16_t vendor_id = VENDOR_ID;
+	pta_params[0].memref.buffer = &vendor_id;
+	pta_params[0].memref.size = 2;
+	pta_params[1].memref.buffer = module_key;
+	pta_params[1].memref.size = 16;
 
 	// ------------ Open Session to PTA ---------
 	res = TEE_OpenTASession(&pta_attestation_uuid, 0, 0, NULL, &pta_session,
@@ -557,6 +645,7 @@ TEE_Result handle_input(void *session, uint32_t param_types, TEE_Param params[4]
 	data = malloc(size);
 
 	Connection* connection = connections_get(params[0].value.b);
+	if(connection == NULL) return TEE_ERROR_BAD_PARAMETERS;
 
 	char nonce[12] = { 0 };
     size_t nonce_sz = 12;
@@ -712,6 +801,8 @@ TEE_Result TA_InvokeCommandEntryPoint(void *session, uint32_t cmd, uint32_t para
 		return set_key(session, param_types, params);
 	case ATTEST:
 		return attest(session, param_types, params);
+	case DISABLE:
+		return disable(session, param_types, params);
 	case HANDLE_INPUT:
 		return handle_input(session, param_types, params);
 	case ENTRY:

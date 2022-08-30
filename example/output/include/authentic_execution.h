@@ -20,14 +20,15 @@
 /* The function IDs implemented in this TA */
 #define SET_KEY                               0
 #define ATTEST                                1
-#define HANDLE_INPUT                          2
-#define ENTRY                                 3
+#define DISABLE                               2
+#define HANDLE_INPUT                          3
+#define ENTRY                                 4
 
 
 TEE_Result handle_input(void *session, uint32_t param_types, TEE_Param params[4]);
 
 void handle_output(void *session, uint32_t output_id, uint32_t param_types,
-                   TEE_Param params[4], unsigned char *data_input uint32_t data_len);
+                   TEE_Param params[4], unsigned char *data_input, uint32_t data_len);
 
 //------------------------------------------------------------------------------
 

@@ -1,6 +1,7 @@
 import os
 
 DEFAULT_LOG_LEVEL = "info"
+DEFAULT_VENDOR_ID = 33
 STUBS_FOLDER = os.path.join(os.path.dirname(
     os.path.abspath(__file__)), "stubs")
 

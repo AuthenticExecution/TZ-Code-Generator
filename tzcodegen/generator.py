@@ -87,6 +87,7 @@ def __run(args):
         auth_exec = f.read()
 
     auth_exec = auth_exec.replace("{header_file}", "<" + module_name + ".h>")
+    auth_exec = auth_exec.replace("{vendor_id}", str(args.vendor_id))
 
     with open(os.path.join(args.output, conf.STUB_AUTH_EXEC), "w") as f:
         f.write(auth_exec)

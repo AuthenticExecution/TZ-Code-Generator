@@ -8,13 +8,15 @@ from . import conf
 
 def _set_parser():
     parser = argparse.ArgumentParser(
-        description='Rust code generator for Authentic Execution')
+        description='TZ code generator for Authentic Execution')
     parser.add_argument('-l', '--loglevel', nargs='?',
                         default=conf.DEFAULT_LOG_LEVEL, type=__log_level)
     parser.add_argument('-i', '--input', required=True,
                         type=__input_dir, help='Input folder of the software module')
     parser.add_argument('-o', '--output', required=True,
                         type=__output_dir, help='Output folder of the software module')
+    parser.add_argument('-v', '--vendor-id', type=__int16bits, required=False,
+                        default=conf.DEFAULT_VENDOR_ID, help='Vendor ID')
 
     return parser
 
@@ -72,3 +74,12 @@ def __output_dir(arg):
         return arg
     raise argparse.ArgumentTypeError(
         "Output dir {} already exists".format(arg))
+
+
+def __int16bits(arg):
+    arg = int(arg, 0)
+    if arg < 0 or arg > 65535:
+        raise argparse.ArgumentTypeError(
+            "Invalid Vendor ID: must be between 0 and 65535")
+
+    return arg

@@ -8,7 +8,7 @@ with open("requirements.txt", "r") as f:
 
 setuptools.setup(
     name="tz-codegen",
-    version="0.2.7",
+    version="0.2.8",
     author="Sepideh Pouyanrad",
     description="Trustzone module code generator for the Authentic Execution framework",
     long_description=long_description,
@@ -22,7 +22,7 @@ setuptools.setup(
     ],
     python_requires='>=3.6',
     entry_points={
-        'console_scripts': ['TZ-Code-Gen = tzcodegen.generator:__main']
+        'console_scripts': ['tz-codegen = tzcodegen.generator:__main']
     },
     include_package_data=True,
 )

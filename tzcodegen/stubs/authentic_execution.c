@@ -12,6 +12,7 @@
 
 #include {header_file}
 
+#define VENDOR_ID {vendor_id}
 #define NUM_INPUTS {num_inputs}
 #define NUM_ENTRIES {num_entrys}
 #define ENTRY_START_INDEX 4
@@ -460,15 +461,19 @@ static TEE_Result attest(void *session, uint32_t param_types,
 	// ------------ Call PTA ---------**************************************************
 	TEE_TASessionHandle pta_session = TEE_HANDLE_NULL;
 	uint32_t ret_origin = 0;
-	uint32_t pta_param_types = TEE_PARAM_TYPES( TEE_PARAM_TYPE_MEMREF_OUTPUT,
-											TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
+	uint32_t pta_param_types = TEE_PARAM_TYPES( TEE_PARAM_TYPE_MEMREF_INPUT,
+											TEE_PARAM_TYPE_MEMREF_OUTPUT, 
+											TEE_PARAM_TYPE_NONE,
 											TEE_PARAM_TYPE_NONE);
 
 	TEE_Param pta_params[TEE_NUM_PARAMS];
 
 	// prepare the parameters for the pta
-	pta_params[0].memref.buffer = module_key;
-	pta_params[0].memref.size = 16;
+	uint16_t vendor_id = VENDOR_ID;
+	pta_params[0].memref.buffer = &vendor_id;
+	pta_params[0].memref.size = 2;
+	pta_params[1].memref.buffer = module_key;
+	pta_params[1].memref.size = 16;
 
 	// ------------ Open Session to PTA ---------
 	res = TEE_OpenTASession(&pta_attestation_uuid, 0, 0, NULL, &pta_session,
