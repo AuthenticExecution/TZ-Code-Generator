@@ -16,10 +16,14 @@ def __run(args):
     _mkdir(out_include)
     _copy(conf.STUB_PTA_H, out_include)
     _copy(conf.STUB_SPONGENT_H, out_include)
+    _copy(conf.STUB_CRYPTO_H, out_include)
     _copy(conf.STUB_AE_H, out_include)
+    _copy(conf.STUB_CONNECTION_H, out_include)
 
     _copy(conf.STUB_SPONGENT, args.output)
+    _copy(conf.STUB_CRYPTO, args.output)
     _copy(conf.STUB_Makefile, args.output)
+    _copy(conf.STUB_CONNECTION, args.output)
     # -------------------------------user_ta_header_defines-------------------------------
     _copy(conf.STUB_USER_TA_HEADER_DEFINES, args.output)
     u = uuid.uuid4()

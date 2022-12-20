@@ -17,6 +17,10 @@ STUB_SUB_MK = "sub.mk"
 STUB_IMPORT = "import.c"
 STUB_TA_H = "ta.h"
 STUB_AUTH_EXEC = "authentic_execution.c"
+STUB_CRYPTO = "crypto.c"
+STUB_CRYPTO_H = "crypto.h"
+STUB_CONNECTION = "connection.c"
+STUB_CONNECTION_H = "connection.h"
 
 # Starting entrypoint index
 # 0 is set_key, 1 is attest, 2 is handle_input
