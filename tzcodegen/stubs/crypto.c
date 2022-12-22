@@ -301,7 +301,7 @@ TEE_Result reset_aes_iv(
         sess->op_handle,
         nonce,
         nonce_sz,
-        SECURITY_BYTES,
+        SECURITY_BYTES * 8, // in bits
         aad_sz,
 		payload_sz
     );
