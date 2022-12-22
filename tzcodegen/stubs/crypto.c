@@ -65,7 +65,7 @@ int decrypt_generic(
                 ciphertext,
                 ciphertext_len,
                 plaintext,
-                (unsigned char *) expected_tag
+                expected_tag
             );
         case EncryptionType_Spongent:
             return SpongentUnwrap(
