@@ -64,8 +64,12 @@ static TEE_Result set_key(void *session, uint32_t param_types,
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
+	// copy tag locally (otherwise decrypt would not work)
+	unsigned char expected_tag[SECURITY_BYTES];
+	TEE_MemMove(expected_tag, params[2].memref.buffer, SECURITY_BYTES);
+
 	DMSG("Decrypting payload..");
-	int decrypt_res = decrypt(
+	int decrypt_res = decrypt_generic(
 		session,
 		EncryptionType_Aes,
 		module_key,
@@ -74,7 +78,7 @@ static TEE_Result set_key(void *session, uint32_t param_types,
 		params[1].memref.buffer,
 		params[1].memref.size,
 		connection.connection_key,
-		params[2].memref.buffer
+		expected_tag
 	);
 
 	if (!decrypt_res) {
@@ -197,24 +201,26 @@ static TEE_Result attest(void *session, uint32_t param_types,
 	if (res != TEE_SUCCESS)
 		return res;
 
-	//*******************************************************************************
-    char nonce[12] = { 0 };
-    size_t nonce_sz = 12;
-	// challenge =  param[0] --> aad
-    alloc_resources(sess, TEE_MODE_ENCRYPT);
-    set_aes_key(sess, module_key);
-    reset_aes_iv(sess, params[0].memref.buffer, params[0].memref.size, nonce, nonce_sz, 0);
+	//TODO remove/change?
+	DMSG("Generating response..");
+	void *tag = TEE_Malloc(16, 0);
 
-	unsigned char challenge[16]={0};
-	memcpy(challenge, params[0].memref.buffer, 16);
+	// encrypt challenge (get the MAC)
+	int r = encrypt_generic(
+		session,
+		EncryptionType_Aes,
+		module_key,
+		params[0].memref.buffer,
+		params[0].memref.size,
+		NULL,
+		0,
+		NULL,
+		tag
+	);
 
-    void *tag = TEE_Malloc(16, 0);
-    uint32_t len = 0, tag_len = 16;
+	DMSG("Response generated");
 
-	res = TEE_AEEncryptFinal(sess->op_handle, NULL,
-				 0, NULL, &len, tag, &tag_len);
-
-	if (!res) {
+	if (r) {
 		params[1].memref.size = 16;
 		TEE_MemMove(params[1].memref.buffer, tag, params[1].memref.size);
     }
@@ -308,7 +314,7 @@ void handle_output(void *session, uint32_t output_id, uint32_t param_types,
 			}
 		} // if AES 
 		else {
-			encrypt(
+			encrypt_generic(
 				session,
 				EncryptionType_Spongent,
 				connection->connection_key,

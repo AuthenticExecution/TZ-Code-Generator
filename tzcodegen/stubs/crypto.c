@@ -2,7 +2,7 @@
 
 #include <spongent.h>
 
-int encrypt(
+int encrypt_generic(
     void *session,
     EncryptionType type,
     const unsigned char *key,
@@ -37,12 +37,14 @@ int encrypt(
                 0
             );
         default:
-            EMSG("Invalid encryption type: %d", type);
-            return 0;
+            break;
     }
+
+    EMSG("Invalid encryption type: %d", type);
+    return 0;
 }
 
-int decrypt(
+int decrypt_generic(
     void *session,
     EncryptionType type,
     const unsigned char *key,
@@ -76,9 +78,11 @@ int decrypt(
                 expected_tag
             );
         default:
-            EMSG("Invalid encryption type: %d", type);
-            return 0;
+            break;
     }
+
+    EMSG("Invalid encryption type: %d", type);
+    return 0;
 }
 
 /* AES-related stuff */
@@ -97,7 +101,7 @@ int encrypt_aes(
 
     // here we use a zero nonce because we assume nonce is inside associated data
     const unsigned char nonce[NONCE_SIZE] = { 0 };
-    unsigned int cipher_len, tag_len;
+    unsigned int cipher_len = plaintext_len, tag_len = SECURITY_BYTES;
 
     if(
         alloc_resources(sess, TEE_MODE_ENCRYPT) != TEE_SUCCESS ||
@@ -153,7 +157,7 @@ int decrypt_aes(
 
     // here we use a zero nonce because we assume nonce is inside associated data
     const unsigned char nonce[NONCE_SIZE] = { 0 };
-    unsigned int plaintext_len;
+    unsigned int plaintext_len = ciphertext_len;
 
     DMSG("Allocating resources..");
 

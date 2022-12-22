@@ -32,7 +32,7 @@ TEE_Result reset_aes_iv(
     size_t payload_sz
 );
 
-int encrypt(
+int encrypt_generic(
     void *session,
     EncryptionType type,
     const unsigned char *key,
@@ -44,7 +44,7 @@ int encrypt(
     unsigned char *tag
 );
 
-int decrypt(
+int decrypt_generic(
     void *session,
     EncryptionType type,
     const unsigned char *key,
