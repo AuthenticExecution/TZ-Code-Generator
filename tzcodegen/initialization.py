@@ -73,7 +73,7 @@ def __output_dir(arg):
     if not os.path.exists(arg):
         return arg
     raise argparse.ArgumentTypeError(
-        "Output dir {} already exists".format(arg))
+        f"Output dir {arg} already exists")
 
 
 def __int16bits(arg):

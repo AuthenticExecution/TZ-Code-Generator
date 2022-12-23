@@ -2,8 +2,8 @@
 /*
  * Copyright (c) 2018-2019, Linaro Limited
  */
-#ifndef __PTA_ATTESTATION_H
-#define __PTA_ATTESTATION_H
+#ifndef __PTA_ATTESTATION_H__
+#define __PTA_ATTESTATION_H__
 
 #include <util.h>
 
@@ -16,4 +16,4 @@
 
 #define ATTESTATION_CMD_GET_MODULE_KEY    	0
 
-#endif /* __PTA_ATTESTATION_H */
+#endif
