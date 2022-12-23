@@ -18,7 +18,6 @@
 input_t input_funcs[NUM_INPUTS] = { {fill_inputs} };
 entry_t entry_funcs[NUM_ENTRIES] = { {fill_entrys} };
 
-int total_node = 0; // WTF is this?!
 unsigned char module_key[SECURITY_BYTES] = { 0 };
 uint16_t current_nonce = 0;
 
@@ -141,7 +140,6 @@ TEE_Result set_key(
 
 	// replace if existing
 	if(!connections_replace(&connection)) {
-		total_node = total_node + 1; //TODO remove this shit
 		connections_add(&connection);
 	}
 
@@ -279,41 +277,46 @@ TEE_Result attest(
 }
 
 void handle_output(
-	uint32_t output_id, //TODO this should be 16 bits
+	uint16_t output_id,
     TEE_Param params[4],
 	unsigned char *data_input,
 	uint32_t data_len
 ) {
-	//TODO change this SHIT please
-	uint8_t index = 0;
-	uint8_t numberOfOutput = 0;
-	int arr[total_node];
-
 	DMSG("Handling output ID %d. Data size: %d", output_id, data_len);
-	find_connections(output_id, arr, &numberOfOutput);
 
-	uint8_t totalOutput = params[0].value.b;
-	uint8_t indexOfData = params[0].value.a;
+	uint32_t total_data_size = params[0].value.a; // data size so far
+	uint32_t total_outputs = params[0].value.b; // outputs already called so far
 
-	// find offsets in output buffers TODO please improve
-	//TODO also need checks to ensure we don't overflow these buffers
-	unsigned char *conn_id_offset = (unsigned char *) params[1].memref.buffer + 2 * totalOutput;
-	unsigned char *payload_offset = (unsigned char *) params[2].memref.buffer + indexOfData;
-	unsigned char *tag_offset = (unsigned char *) params[3].memref.buffer + SECURITY_BYTES * totalOutput;
+	// find offsets in output buffers
+	unsigned char *conn_id_offset = (unsigned char *) params[1].memref.buffer + 2 * total_outputs;
+	unsigned char *payload_offset = (unsigned char *) params[2].memref.buffer + total_data_size;
 
-	DMSG("Number of connections found: %d", numberOfOutput);
+	// iterate over all connections for this output and compute payload+MAC
+	for(
+		Node *node = connections_get_head();
+		node != NULL; 
+		node = node->next
+	) {
+		Connection* conn = &node->connection;
+		if(conn->io_id != output_id) continue;
 
-	// iterate over all connections found for this output and compute payload+MAC
-	for(int i = 0; i < numberOfOutput; i++) {
-		DMSG("Computing payload for connection %d", arr[i]);
+		// check if we still have some space left in the buffers
+		if(
+			total_data_size + 4 + data_len + SECURITY_BYTES > OUTPUT_DATA_MAX_SIZE ||
+			total_outputs >= MAX_CONCURRENT_OUTPUTS
+		) {
+			EMSG("WARNING: buffers are full, cannot accept new outputs");
+			break;	
+		}
 
-		Connection* conn = connections_get(arr[i]);
+		DMSG("Computing payload for connection %d", conn->conn_id);
+
 		// reverse nonce and conn_id (i.e., convert from little to big endian)
 		uint16_t nonce_rev = conn->nonce << 8 | conn->nonce >> 8;
-		uint16_t conn_id_rev = conn->conn_id << 8 | conn->conn_id >> 8;
 
-		// add conn_id to buffer
-		TEE_MemMove(conn_id_offset + 2 * i, (void *) &conn_id_rev, 2);
+		// set conn_id and data length
+		TEE_MemMove(conn_id_offset, (void *) &conn->conn_id, 2);
+		TEE_MemMove(payload_offset, (void *) &data_len, 4);
 
 		// encrypt payload
 		TEE_Result res = encrypt_generic(
@@ -323,8 +326,8 @@ void handle_output(
 			2,
 			data_input,
 			data_len,
-			payload_offset + index + 1,
-			tag_offset + SECURITY_BYTES * i
+			payload_offset + 4,
+			payload_offset + 4 + data_len
 		);
 
 		if(res != TEE_SUCCESS) {
@@ -334,17 +337,23 @@ void handle_output(
 				output_id,
 				res
 			);
-			return;
+			continue;
 		}
 
-		payload_offset[index] = data_len & 0xFF; //TODO what if it's bigger than 8 bits?!!?!?
-		index = index + data_len + 1; // why the hell + 1?!
 		conn->nonce = conn->nonce + 1;
+
+		// update variables
+		total_data_size += 4 + data_len + SECURITY_BYTES;
+		total_outputs++;
+
+		// update offsets
+		conn_id_offset += 2;
+		payload_offset += 4 + data_len + SECURITY_BYTES;
 	}
 
-	//TODO please, please change this
-	params[0].value.b = totalOutput + numberOfOutput;
-	params[0].value.a = indexOfData + (data_len * numberOfOutput) + numberOfOutput;
+	//update total number of connections and offset
+	params[0].value.a = total_data_size;
+	params[0].value.b = total_outputs;
 	DMSG("handle_output completed");
 }
 
@@ -356,18 +365,26 @@ TEE_Result handle_input(
 		TEE_PARAM_TYPE_VALUE_INOUT,
 		TEE_PARAM_TYPE_MEMREF_OUTPUT,
 		TEE_PARAM_TYPE_MEMREF_INOUT,
-		TEE_PARAM_TYPE_MEMREF_INOUT
+		TEE_PARAM_TYPE_MEMREF_INPUT
 	);
 
 	// sanity checks
-	// TODO parametrize max size of buffers, both here and in EM. Check consistency
 	if(
-		param_types != exp_param_types
+		param_types != exp_param_types ||
+		params[1].memref.size < 2 * MAX_CONCURRENT_OUTPUTS || // connection IDs
+		params[2].memref.size < OUTPUT_DATA_MAX_SIZE + SECURITY_BYTES * MAX_CONCURRENT_OUTPUTS || // payloads
+		params[3].memref.size < SECURITY_BYTES // tag
 	) {
 		EMSG(
-			"Bad inputs: %d/%d",
+			"Bad inputs: %d/%d %d/%d %d/%d %d/%d",
 			param_types,
-			exp_param_types
+			exp_param_types,
+			params[1].memref.size,
+			2 * MAX_CONCURRENT_OUTPUTS,
+			params[2].memref.size,
+			OUTPUT_DATA_MAX_SIZE + SECURITY_BYTES * MAX_CONCURRENT_OUTPUTS,
+			params[3].memref.size,
+			SECURITY_BYTES
 		);
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
@@ -442,18 +459,23 @@ TEE_Result handle_entry(
 		TEE_PARAM_TYPE_VALUE_INOUT,
 		TEE_PARAM_TYPE_MEMREF_OUTPUT,
 		TEE_PARAM_TYPE_MEMREF_INOUT,
-		TEE_PARAM_TYPE_MEMREF_OUTPUT
+		TEE_PARAM_TYPE_NONE
 	);
 
 	// sanity checks
-	// TODO parametrize max size of buffers, both here and in EM. Check consistency
 	if(
-		param_types != exp_param_types
+		param_types != exp_param_types ||
+		params[1].memref.size < 2 * MAX_CONCURRENT_OUTPUTS || // connection IDs
+		params[2].memref.size < OUTPUT_DATA_MAX_SIZE + SECURITY_BYTES * MAX_CONCURRENT_OUTPUTS // payloads
 	) {
 		EMSG(
-			"Bad inputs: %d/%d",
+			"Bad inputs: %d/%d %d/%d %d/%d",
 			param_types,
-			exp_param_types
+			exp_param_types,
+			params[1].memref.size,
+			2 * MAX_CONCURRENT_OUTPUTS,
+			params[2].memref.size,
+			OUTPUT_DATA_MAX_SIZE + SECURITY_BYTES * MAX_CONCURRENT_OUTPUTS
 		);
 		return TEE_ERROR_BAD_PARAMETERS;
 	}

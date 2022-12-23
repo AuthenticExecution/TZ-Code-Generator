@@ -51,21 +51,6 @@ int connections_replace(Connection* connection) {
     return 0;
 }
 
-//TODO remove this shit
-void find_connections(uint16_t io_id, int *arr, uint8_t *num) {
-    Node* current = connections_head;
-    while (current != NULL) {
-        Connection* connection = &current->connection;
-        if (connection->io_id == io_id) {
-            arr[*num] = connection->conn_id;
-            *num = *num + 1;
-        }
-
-        current = current->next;
-    }
-
-}
-
 void delete_all_connections(void) {
 	Node* old = NULL;
 	Node* current = connections_head;

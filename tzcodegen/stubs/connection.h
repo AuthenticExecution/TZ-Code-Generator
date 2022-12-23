@@ -22,7 +22,6 @@ Node* connections_get_head(void);
 int connections_add(Connection* connection);
 Connection* connections_get(uint16_t conn_id);
 int connections_replace(Connection* connection);
-void find_connections(uint16_t io_id, int *arr, uint8_t *num);
 void delete_all_connections(void);
 
 #endif

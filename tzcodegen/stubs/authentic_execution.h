@@ -11,7 +11,10 @@ typedef enum {
     Entry_UserDefined
 } EntrypointID;
 
+/* Definitions of fixed parameters */
 #define ENTRY_START_INDEX 4
+#define OUTPUT_DATA_MAX_SIZE 1024 * 1024 // total size (for all concurrent outputs) in bytes
+#define MAX_CONCURRENT_OUTPUTS 32
 
 /* Definition of Authentic Execution macros and parameters */
 #define SM_OUTPUT_AUX(name, output_id)                                         \
@@ -47,7 +50,7 @@ TEE_Result attest(
 );
 
 void handle_output(
-  uint32_t output_id,
+  uint16_t output_id,
   TEE_Param params[4],
   unsigned char *data_input,
   uint32_t data_len
