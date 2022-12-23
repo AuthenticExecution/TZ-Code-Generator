@@ -40,5 +40,5 @@ INPUT_PATTERN = ('^[ \t]*SM_INPUT[ \t]*\([ \t]*([a-zA-Z_][a-zA-Z_0-9]*)[ \t]*,'
 ENTRY_PATTERN = ('^[ \t]*SM_ENTRY[ \t]*\([ \t]*([a-zA-Z_][a-zA-Z_0-9]*)[ \t]*,'
                  '[ \t]*[a-zA-Z_][a-zA-Z_0-9]*[ \t]*,[ \t]*[a-zA-Z_][a-zA-Z_0-9]*[ \t]*\)')
 OUTPUT_REPL = "SM_OUTPUT_AUX(\\1, {});"
-IO_SIGNATURE = ("void {}(void *session, uint32_t param_types, TEE_Param params[4],"
+IO_SIGNATURE = ("void {}(void *session, TEE_Param params[4], "
                 "unsigned char *data, uint32_t len);\n")

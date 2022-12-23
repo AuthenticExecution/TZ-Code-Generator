@@ -2,7 +2,39 @@
 
 #include <spongent.h>
 
-int encrypt_generic(
+TEE_Result encrypt_aes(
+    void *session,
+    const unsigned char *key,
+    const unsigned char *ad,
+    unsigned int ad_len,
+    const unsigned char *plaintext,
+    unsigned int plaintext_len,
+    unsigned char *ciphertext,
+    unsigned char *tag
+);
+TEE_Result decrypt_aes(
+    void *session,
+    const unsigned char *key,
+    const unsigned char *ad,
+    unsigned int ad_len,
+    const unsigned char *ciphertext,
+    unsigned int ciphertext_len,
+    unsigned char *plaintext,
+    const unsigned char *expected_tag
+);
+void clean_session(struct aes_cipher *sess);
+TEE_Result alloc_resources(struct aes_cipher *sess, uint32_t mode);
+TEE_Result set_aes_key(struct aes_cipher *sess, const unsigned char *key);
+TEE_Result reset_aes_iv(
+    struct aes_cipher *sess,
+    const unsigned char *aad,
+    size_t aad_sz,
+    const unsigned char *nonce,
+    size_t nonce_sz,
+    size_t payload_sz
+);
+
+TEE_Result encrypt_generic(
     void *session,
     EncryptionType type,
     const unsigned char *key,
@@ -44,7 +76,7 @@ int encrypt_generic(
     return 0;
 }
 
-int decrypt_generic(
+TEE_Result decrypt_generic(
     void *session,
     EncryptionType type,
     const unsigned char *key,
@@ -86,7 +118,7 @@ int decrypt_generic(
 }
 
 /* AES-related stuff */
-int encrypt_aes(
+TEE_Result encrypt_aes(
     void *session,
     const unsigned char *key,
     const unsigned char *ad,
@@ -96,7 +128,7 @@ int encrypt_aes(
     unsigned char *ciphertext,
     unsigned char *tag
 ) {
-    /* Get ciphering context from session ID */
+    TEE_Result res;
 	struct aes_cipher *sess = (struct aes_cipher *) session;
 
     // here we use a zero nonce because we assume nonce is inside associated data
@@ -104,15 +136,15 @@ int encrypt_aes(
     unsigned int cipher_len = plaintext_len, tag_len = SECURITY_BYTES;
 
     if(
-        alloc_resources(sess, TEE_MODE_ENCRYPT) != TEE_SUCCESS ||
-        set_aes_key(sess, key) != TEE_SUCCESS ||
-        reset_aes_iv(sess, ad, ad_len, nonce, NONCE_SIZE, plaintext_len) != TEE_SUCCESS
+        (res = alloc_resources(sess, TEE_MODE_ENCRYPT)) != TEE_SUCCESS ||
+        (res = set_aes_key(sess, key)) != TEE_SUCCESS ||
+        (res = reset_aes_iv(sess, ad, ad_len, nonce, NONCE_SIZE, plaintext_len)) != TEE_SUCCESS
     ) {
         clean_session(sess);
-        return 0;
+        return res;
     }
 
-    TEE_Result res = TEE_AEEncryptFinal(
+    res = TEE_AEEncryptFinal(
         sess->op_handle,
         plaintext,
         plaintext_len,
@@ -125,24 +157,24 @@ int encrypt_aes(
     clean_session(sess);
 
     if(res != TEE_SUCCESS) {
-        EMSG("AES encryption failed: %d", res);
-        return 0;
+        EMSG("AES encryption failed: %x", res);
+        return res;
     }
 
     if(cipher_len != plaintext_len) {
         EMSG("Ciphertext size differs from plaintext: %d/%d", plaintext_len, cipher_len);
-        return 0;
+        return TEE_ERROR_GENERIC;
     }
 
     if(tag_len != SECURITY_BYTES) {
         EMSG("Tag size differs from expected: %d/%d", tag_len, SECURITY_BYTES);
-        return 0;
+        return TEE_ERROR_GENERIC;
     }
 
-    return 1;
+    return TEE_SUCCESS;
 }
 
-int decrypt_aes(
+TEE_Result decrypt_aes(
     void *session,
     const unsigned char *key,
     const unsigned char *ad,
@@ -152,50 +184,49 @@ int decrypt_aes(
     unsigned char *plaintext,
     const unsigned char *expected_tag
 ) {
-    /* Get ciphering context from session ID */
+    TEE_Result res;
 	struct aes_cipher *sess = (struct aes_cipher *) session;
 
     // here we use a zero nonce because we assume nonce is inside associated data
     const unsigned char nonce[NONCE_SIZE] = { 0 };
     unsigned int plaintext_len = ciphertext_len;
 
-    DMSG("Allocating resources..");
-
     if(
-        alloc_resources(sess, TEE_MODE_DECRYPT) != TEE_SUCCESS ||
-        set_aes_key(sess, key) != TEE_SUCCESS ||
-        reset_aes_iv(sess, ad, ad_len, nonce, NONCE_SIZE, ciphertext_len) != TEE_SUCCESS
+        (res = alloc_resources(sess, TEE_MODE_DECRYPT)) != TEE_SUCCESS ||
+        (res = set_aes_key(sess, key)) != TEE_SUCCESS ||
+        (res = reset_aes_iv(sess, ad, ad_len, nonce, NONCE_SIZE, ciphertext_len)) != TEE_SUCCESS
     ) {
         clean_session(sess);
-        return 0;
+        return res;
     }
 
-    DMSG("Decrypting..");
+	// copy tag locally (otherwise decrypt would fail)
+    unsigned char tag[SECURITY_BYTES];
+	TEE_MemMove(tag, expected_tag, SECURITY_BYTES);
 
-    TEE_Result res = TEE_AEDecryptFinal(
+    res = TEE_AEDecryptFinal(
         sess->op_handle,
         ciphertext,
         ciphertext_len,
         plaintext,
         &plaintext_len,
-        expected_tag,
+        tag,
         SECURITY_BYTES
     );
 
-    DMSG("Cleaning session..");
     clean_session(sess);
 
     if(res != TEE_SUCCESS) {
-        EMSG("AES decryption failed: %d", res);
-        return 0;
+        EMSG("AES decryption failed: %x", res);
+        return res;
     }
 
     if(ciphertext_len != plaintext_len) {
         EMSG("Plaintext size differs from ciphertext: %d/%d", ciphertext_len, plaintext_len);
-        return 0;
+        return TEE_ERROR_GENERIC;
     }
 
-    return 1;
+    return TEE_SUCCESS;
 }
 
 void clean_session(struct aes_cipher *sess) {

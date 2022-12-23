@@ -514,7 +514,7 @@ HashReturn SpongentUnwrap(const BitSequence* key,
         return ret;
 
     //if (!std::equal(std::begin(tag), std::end(tag), expectedTag))
-	if (memcmp(tag, expectedTag, TAG_SIZE_BYTES) == 0)
+	if (memcmp(tag, expectedTag, TAG_SIZE_BYTES) != 0)
         return BAD_TAG;
 
     return SUCCESS;
@@ -526,6 +526,3 @@ HashReturn SpongentMac(const BitSequence* key,
 {
     return SpongentWrap(key, input, bitLength, NULL, 0, NULL, mac, false);
 }
-
-//--------------------------------------------------------------------------------------------
-
