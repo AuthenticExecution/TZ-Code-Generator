@@ -17,6 +17,10 @@ STUB_SUB_MK = "sub.mk"
 STUB_IMPORT = "import.c"
 STUB_TA_H = "ta.h"
 STUB_AUTH_EXEC = "authentic_execution.c"
+STUB_CRYPTO = "crypto.c"
+STUB_CRYPTO_H = "crypto.h"
+STUB_CONNECTION = "connection.c"
+STUB_CONNECTION_H = "connection.h"
 
 # Starting entrypoint index
 # 0 is set_key, 1 is attest, 2 is handle_input
@@ -36,5 +40,4 @@ INPUT_PATTERN = ('^[ \t]*SM_INPUT[ \t]*\([ \t]*([a-zA-Z_][a-zA-Z_0-9]*)[ \t]*,'
 ENTRY_PATTERN = ('^[ \t]*SM_ENTRY[ \t]*\([ \t]*([a-zA-Z_][a-zA-Z_0-9]*)[ \t]*,'
                  '[ \t]*[a-zA-Z_][a-zA-Z_0-9]*[ \t]*,[ \t]*[a-zA-Z_][a-zA-Z_0-9]*[ \t]*\)')
 OUTPUT_REPL = "SM_OUTPUT_AUX(\\1, {});"
-IO_SIGNATURE = ("void {}(void *session, uint32_t param_types, TEE_Param params[4],"
-                "unsigned char *data, uint32_t len);\n")
+IO_SIGNATURE = ("void {}(TEE_Param params[4], unsigned char *data, uint32_t len);\n")

@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "spongent.h"
+#include <spongent.h>
 
 /* Spongent S-box */
 int S[16] = { 0xe, 0xd, 0xb, 0x0, 0x2, 0x1, 0x4, 0xf, 0x7, 0xa, 0x8, 0x5, 0x9, 0xc, 0x3, 0x6};
@@ -38,7 +38,7 @@ int  sBoxLayer[256] = {
 
 //--------------------------------------------------------------------------------------------
 
-DataLength min(DataLength a, DataLength b){
+static DataLength min(DataLength a, DataLength b){
 	if(a <= b){
 		return a;
 	}
@@ -48,22 +48,22 @@ DataLength min(DataLength a, DataLength b){
 }
 //--------------------------------------------------------------------------------------------
 
-void copy_n(BitSequence *first, int num, BitSequence *result){
+static void copy_n(const BitSequence *first, int num, BitSequence *result){
 
     for(int i = 0; i < num; i++){
         result[i] = first[i];
     }
 }
 //-----------------------------------------------------------------------------------------
-
-void PrintState(hashState *state)
+#ifdef _PrintState_
+static void PrintState(hashState *state)
 {
 	int i;
 	for (i=nSBox-1; i>=0; i--)
 		printf("%02X", state->value[i]);
 	printf("\n");
 }
-
+#endif
 //--------------------------------------------------------------------------------------------
 
 bit16 lCounter(bit16 lfsr)
@@ -185,6 +185,7 @@ void Permute(hashState *state)
 		case  25625616:	IV = 0x9e;	break;
 		case 256256128:	IV = 0xfb;	break;
 		case 256512256:	IV = 0x015;	break;
+		default: break; // we do nothing
 	}
 
 	for(i = 0; i < nRounds; i++){
@@ -351,7 +352,7 @@ HashReturn SpongentHash(const BitSequence *data, DataLength databitlen, BitSeque
 	return SUCCESS;
 }
 
-HashReturn Duplexing(hashState* state,
+static HashReturn Duplexing(hashState* state,
                      BitSequence* block,
                      DataLength blockBitLength,
                      BitSequence* out,
@@ -452,7 +453,7 @@ HashReturn SpongentWrap(const BitSequence* key,
     {
         copy_n(unwrap ? output : input, SW_RATE_BYTES, block);
         block[SW_RATE_BYTES] = 0x01;
-        HashReturn ret = Duplexing(&state, block, SW_RATE + 1, duplexOut, 16);
+        ret = Duplexing(&state, block, SW_RATE + 1, duplexOut, 16);
 
         if (ret != SUCCESS)
             return ret;
@@ -513,7 +514,7 @@ HashReturn SpongentUnwrap(const BitSequence* key,
         return ret;
 
     //if (!std::equal(std::begin(tag), std::end(tag), expectedTag))
-	if (memcmp(tag, expectedTag, TAG_SIZE_BYTES) == 0)
+	if (memcmp(tag, expectedTag, TAG_SIZE_BYTES) != 0)
         return BAD_TAG;
 
     return SUCCESS;
@@ -525,6 +526,3 @@ HashReturn SpongentMac(const BitSequence* key,
 {
     return SpongentWrap(key, input, bitLength, NULL, 0, NULL, mac, false);
 }
-
-//--------------------------------------------------------------------------------------------
-
