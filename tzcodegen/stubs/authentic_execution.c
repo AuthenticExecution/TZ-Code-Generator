@@ -18,11 +18,9 @@
 input_t input_funcs[NUM_INPUTS] = { {fill_inputs} };
 entry_t entry_funcs[NUM_ENTRIES] = { {fill_entrys} };
 
-static const TEE_UUID pta_attestation_uuid = ATTESTATION_UUID;
-
 int total_node = 0; // WTF is this?!
 unsigned char module_key[SECURITY_BYTES] = { 0 };
-//TODO store current nonce for set_key and disable!!
+uint16_t current_nonce = 0;
 
 static TEE_Result retrieve_module_key(void) {
 	TEE_TASessionHandle pta_session = TEE_HANDLE_NULL;
@@ -44,8 +42,9 @@ static TEE_Result retrieve_module_key(void) {
 	pta_params[1].memref.size = SECURITY_BYTES;
 
 	// open session to PTA
+	TEE_UUID pta_uuid = ATTESTATION_UUID;
 	TEE_Result res = TEE_OpenTASession(
-		&pta_attestation_uuid,
+		&pta_uuid,
 		0,
 		0,
 		NULL,
@@ -78,6 +77,7 @@ TEE_Result set_key(
 	TEE_Param params[4]
 ) {
 	const unsigned int ad_len = 7;
+	const unsigned char *ad = params[0].memref.buffer;
 	const uint32_t exp_param_types = TEE_PARAM_TYPES(
 		TEE_PARAM_TYPE_MEMREF_INPUT,
 		TEE_PARAM_TYPE_MEMREF_INPUT,
@@ -107,6 +107,13 @@ TEE_Result set_key(
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
+	// check nonce: we only allow nonces >= current stored in memory
+	uint16_t nonce_input = (ad[5] << 8) | ad[6];
+	if(nonce_input < current_nonce) {
+		EMSG("Invalid nonce");
+		return TEE_ERROR_BAD_PARAMETERS;
+	}
+
 	// decrypt data
 	TEE_Result res = decrypt_generic(
 		EncryptionType_Aes,
@@ -124,7 +131,7 @@ TEE_Result set_key(
 		return res;
 	}
 
-	const unsigned char *ad = params[0].memref.buffer;
+	current_nonce++;
 	connection.encryption = ad[0];
 	connection.conn_id = (ad[1] << 8) | ad[2];
 	connection.io_id = (ad[3] << 8) | ad[4];
@@ -146,6 +153,7 @@ TEE_Result disable(
 	TEE_Param params[4]
 ) {
 	const unsigned int ad_len = 2, cipher_len = 2;
+	const unsigned char *ad = params[0].memref.buffer;
 	const uint32_t exp_param_types = TEE_PARAM_TYPES(
 		TEE_PARAM_TYPE_MEMREF_INPUT,
 		TEE_PARAM_TYPE_MEMREF_INPUT,
@@ -174,6 +182,13 @@ TEE_Result disable(
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
+	// check nonce: we only allow nonces >= current stored in memory
+	uint16_t nonce_input = (ad[0] << 8) | ad[1];
+	if(nonce_input < current_nonce) {
+		EMSG("Invalid nonce");
+		return TEE_ERROR_BAD_PARAMETERS;
+	}
+
 	unsigned char decrypted_nonce[cipher_len];
 
 	// decrypt data
@@ -192,6 +207,8 @@ TEE_Result disable(
 		EMSG("Failed to decrypt data: %x", res);
 		return res;
 	}
+
+	current_nonce++;
 
 	// all done: deleting all connections
 	DMSG("Deleting all connections");
