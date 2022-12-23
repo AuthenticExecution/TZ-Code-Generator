@@ -74,7 +74,6 @@ static TEE_Result retrieve_module_key(void) {
 }
 
 TEE_Result set_key(
-	void *session,
 	uint32_t param_types,
 	TEE_Param params[4]
 ) {
@@ -110,7 +109,6 @@ TEE_Result set_key(
 
 	// decrypt data
 	TEE_Result res = decrypt_generic(
-		session,
 		EncryptionType_Aes,
 		module_key,
 		params[0].memref.buffer,
@@ -144,7 +142,6 @@ TEE_Result set_key(
 }
 
 TEE_Result disable(
-	void *session,
 	uint32_t param_types,
 	TEE_Param params[4]
 ) {
@@ -181,7 +178,6 @@ TEE_Result disable(
 
 	// decrypt data
 	TEE_Result res = decrypt_generic(
-		session,
 		EncryptionType_Aes,
 		module_key,
 		params[0].memref.buffer,
@@ -204,7 +200,6 @@ TEE_Result disable(
 }
 
 TEE_Result attest(
-	void *session,
 	uint32_t param_types,
 	TEE_Param params[4]
 ) {
@@ -245,7 +240,6 @@ TEE_Result attest(
 
 	// encrypt challenge to compute MAC
 	res = encrypt_generic(
-		session,
 		EncryptionType_Aes,
 		module_key,
 		params[0].memref.buffer,
@@ -268,7 +262,6 @@ TEE_Result attest(
 }
 
 void handle_output(
-	void *session,
 	uint32_t output_id, //TODO this should be 16 bits
     TEE_Param params[4],
 	unsigned char *data_input,
@@ -307,7 +300,6 @@ void handle_output(
 
 		// encrypt payload
 		TEE_Result res = encrypt_generic(
-			session,
 			conn->encryption,
 			conn->connection_key,
 			(void *) &nonce_rev, // nonce is the associated data
@@ -340,7 +332,6 @@ void handle_output(
 }
 
 TEE_Result handle_input(
-	void *session,
 	uint32_t param_types,
 	TEE_Param params[4]
 ) {
@@ -387,7 +378,6 @@ TEE_Result handle_input(
 
 	// decrypt data
 	TEE_Result res = decrypt_generic(
-		session,
 		conn->encryption,
 		conn->connection_key,
 		(void *) &nonce_rev,
@@ -412,7 +402,6 @@ TEE_Result handle_input(
 	// call input function
 	if(conn->io_id < NUM_INPUTS) {
 		input_funcs[conn->io_id](
-			session,
 			params,
 			payload,
 			payload_size
@@ -429,7 +418,6 @@ TEE_Result handle_input(
 }
 
 TEE_Result handle_entry(
-	void *session,
 	uint32_t param_types,
 	TEE_Param params[4]
 ) {
@@ -477,7 +465,6 @@ TEE_Result handle_entry(
 		entry_id - ENTRY_START_INDEX < NUM_ENTRIES
 	) {
 		entry_funcs[entry_id - ENTRY_START_INDEX](
-			session,
 			params,
 			payload,
 			payload_size
@@ -511,38 +498,16 @@ TEE_Result TA_OpenSessionEntryPoint(
 	TEE_Param __unused params[4],
 	void __unused **session
 ) {
-	struct aes_cipher *sess;
-	sess = TEE_Malloc(sizeof(*sess), 0);
-	if (!sess)
-		return TEE_ERROR_OUT_OF_MEMORY;
-
-	sess->key_handle = TEE_HANDLE_NULL;
-	sess->op_handle = TEE_HANDLE_NULL;
-
-	*session = (void *)sess;
-
 	return TEE_SUCCESS;
 }
 
 // close session
-void TA_CloseSessionEntryPoint(void *session) {
-
-	struct aes_cipher *sess;
-
-	/* Get ciphering context from session ID */
-	sess = (struct aes_cipher *)session;
-
-	/* Release the session resources */
-	if (sess->key_handle != TEE_HANDLE_NULL)
-		TEE_FreeTransientObject(sess->key_handle);
-	if (sess->op_handle != TEE_HANDLE_NULL)
-		TEE_FreeOperation(sess->op_handle);
-	TEE_Free(sess);
+void TA_CloseSessionEntryPoint(void __unused *session) {
 }
 
 // invoke command
 TEE_Result TA_InvokeCommandEntryPoint(
-	void *session,
+	void __unused *session,
 	uint32_t cmd,
 	uint32_t param_types,
 	TEE_Param params[4]
@@ -550,19 +515,19 @@ TEE_Result TA_InvokeCommandEntryPoint(
 	switch (cmd) {
 		case Entry_SetKey:
 			DMSG("Calling set_key");
-			return set_key(session, param_types, params);
+			return set_key(param_types, params);
 		case Entry_Attest:
 			DMSG("Calling attest");
-			return attest(session, param_types, params);
+			return attest(param_types, params);
 		case Entry_Disable:
 			DMSG("Calling disable");
-			return disable(session, param_types, params);
+			return disable(param_types, params);
 		case Entry_HandleInput:
 			DMSG("Calling handle_input");
-			return handle_input(session, param_types, params);
+			return handle_input(param_types, params);
 		case Entry_UserDefined:
 			DMSG("Calling handle_entry");
-			return handle_entry(session, param_types, params);
+			return handle_entry(param_types, params);
 		default:
 			EMSG("Command ID %d is not supported", cmd);
 			return TEE_ERROR_NOT_SUPPORTED;
