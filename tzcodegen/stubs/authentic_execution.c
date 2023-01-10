@@ -21,6 +21,14 @@ entry_t entry_funcs[NUM_ENTRIES] = { {fill_entrys} };
 unsigned char module_key[SECURITY_BYTES] = { 0 };
 uint16_t current_nonce = 0;
 
+static void measure_time(char *msg) {
+#ifdef MEASURE_TIME
+	TEE_Time t = {};
+	TEE_GetREETime(&t);
+	DMSG("tz_%s: %lu%06lu us", msg, t.seconds, t.millis * 1000);
+#endif
+}
+
 static TEE_Result retrieve_module_key(void) {
 	TEE_TASessionHandle pta_session = TEE_HANDLE_NULL;
 	uint32_t ret_origin = 0;
@@ -311,6 +319,8 @@ void handle_output(
 
 		DMSG("Computing payload for connection %d", conn->conn_id);
 
+		measure_time("handle_output_before_encryption");
+
 		// reverse nonce and conn_id (i.e., convert from little to big endian)
 		uint16_t nonce_rev = conn->nonce << 8 | conn->nonce >> 8;
 
@@ -339,6 +349,8 @@ void handle_output(
 			);
 			continue;
 		}
+
+		measure_time("handle_output_after_encryption");
 
 		conn->nonce = conn->nonce + 1;
 
@@ -400,6 +412,8 @@ TEE_Result handle_input(
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
+	measure_time("handle_input_before_decryption");
+
 	// nonce will be used as associated data. Converting from little to big endian
 	uint16_t nonce_rev = conn->nonce << 8 | conn->nonce >> 8;
 
@@ -428,6 +442,8 @@ TEE_Result handle_input(
 		return res;
 	}
 
+	measure_time("handle_input_after_decryption");
+
 	conn->nonce = conn->nonce + 1;
 	// params[0] is used to store data for possible outputs
 	params[0].value.a = 0;
@@ -448,6 +464,8 @@ TEE_Result handle_input(
 	}
 
 	TEE_Free(payload);
+
+	measure_time("handle_input_after_handler");
 	return res;
 }
 

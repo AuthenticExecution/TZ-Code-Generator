@@ -15,6 +15,7 @@ typedef enum {
 #define ENTRY_START_INDEX 4
 #define OUTPUT_DATA_MAX_SIZE 1024 * 1024 // total size (for all concurrent outputs) in bytes
 #define MAX_CONCURRENT_OUTPUTS 32
+#define MEASURE_TIME 1
 
 /* Definition of Authentic Execution macros and parameters */
 #define SM_OUTPUT_AUX(name, output_id)                                         \
