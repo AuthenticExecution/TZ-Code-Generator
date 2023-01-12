@@ -241,7 +241,6 @@ void clean_session(struct aes_cipher *sess) {
 }
 
 TEE_Result alloc_resources(struct aes_cipher *sess, uint32_t mode) {
-	TEE_Attribute attr;
 	TEE_Result res;
 
     // initialize struct
@@ -273,21 +272,6 @@ TEE_Result alloc_resources(struct aes_cipher *sess, uint32_t mode) {
 		return res;
 	}
 
-    unsigned char key[SECURITY_BYTES] = {0};
-	TEE_InitRefAttribute(&attr, TEE_ATTR_SECRET_VALUE, &key, SECURITY_BYTES);
-
-	res = TEE_PopulateTransientObject(sess->key_handle, &attr, 1);
-	if (res != TEE_SUCCESS) {
-		EMSG("TEE_PopulateTransientObject failed, %x", res);
-        return res;
-	}
-
-	res = TEE_SetOperationKey(sess->op_handle, sess->key_handle);
-	if (res != TEE_SUCCESS) {
-		EMSG("TEE_SetOperationKey failed %x", res);
-        return res;
-	}
-
 	return TEE_SUCCESS;
 }
 
@@ -296,7 +280,6 @@ TEE_Result set_aes_key(struct aes_cipher *sess, const unsigned char *key) {
 	TEE_Result res;
 
 	TEE_InitRefAttribute(&attr, TEE_ATTR_SECRET_VALUE, key, SECURITY_BYTES);
-	TEE_ResetTransientObject(sess->key_handle);
 
 	res = TEE_PopulateTransientObject(sess->key_handle, &attr, 1);
 	if (res != TEE_SUCCESS) {
@@ -304,7 +287,6 @@ TEE_Result set_aes_key(struct aes_cipher *sess, const unsigned char *key) {
 		return res;
 	}
 
-	TEE_ResetOperation(sess->op_handle);
 	res = TEE_SetOperationKey(sess->op_handle, sess->key_handle);
 	if (res != TEE_SUCCESS) {
 		EMSG("TEE_SetOperationKey failed %x", res);
