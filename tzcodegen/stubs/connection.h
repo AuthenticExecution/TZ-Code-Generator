@@ -10,7 +10,7 @@ typedef struct
 	uint16_t conn_id;
     uint16_t io_id;
     uint16_t nonce;
-    unsigned char connection_key[SECURITY_BYTES];
+    key_t connection_key;
 } Connection;
 
 typedef struct Node {

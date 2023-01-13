@@ -4,13 +4,8 @@
 
 #define NONCE_SIZE 12
 
-struct aes_cipher {
-	TEE_OperationHandle op_handle;	/* AES ciphering operation */
-	TEE_ObjectHandle key_handle;	/* transient object to load the key */
-};
-
 TEE_Result encrypt_aes(
-    const unsigned char *key,
+    key_t *key,
     const unsigned char *ad,
     unsigned int ad_len,
     const unsigned char *plaintext,
@@ -19,7 +14,7 @@ TEE_Result encrypt_aes(
     unsigned char *tag
 );
 TEE_Result decrypt_aes(
-    const unsigned char *key,
+    key_t *key,
     const unsigned char *ad,
     unsigned int ad_len,
     const unsigned char *ciphertext,
@@ -27,21 +22,41 @@ TEE_Result decrypt_aes(
     unsigned char *plaintext,
     const unsigned char *expected_tag
 );
-void clean_session(struct aes_cipher *sess);
-TEE_Result alloc_resources(struct aes_cipher *sess, uint32_t mode);
-TEE_Result set_aes_key(struct aes_cipher *sess, const unsigned char *key);
-TEE_Result reset_aes_iv(
-    struct aes_cipher *sess,
+TEE_Result reset_operation(
+    TEE_OperationHandle op_handle,
     const unsigned char *aad,
     size_t aad_sz,
     const unsigned char *nonce,
     size_t nonce_sz,
     size_t payload_sz
 );
+TEE_Result init_aes_key(
+    key_t *key_struct
+);
+
+TEE_Result init_key(
+    EncryptionType type,
+    key_t *key
+) {
+    switch(type) {
+        case EncryptionType_Aes:
+            return init_aes_key(key);
+        case EncryptionType_Spongent:
+            key->encrypt_handle = TEE_HANDLE_NULL;
+            key->decrypt_handle = TEE_HANDLE_NULL;
+            key->key_handle = TEE_HANDLE_NULL;
+            return TEE_SUCCESS;
+        default:
+            break;
+    }
+
+    EMSG("Invalid encryption type: %d", type);
+    return TEE_ERROR_NOT_SUPPORTED;
+}
 
 TEE_Result encrypt_generic(
     EncryptionType type,
-    const unsigned char *key,
+    key_t *key,
     const unsigned char *ad,
     unsigned int ad_len,
     const unsigned char *plaintext,
@@ -62,7 +77,7 @@ TEE_Result encrypt_generic(
             );
         case EncryptionType_Spongent:
             return SpongentWrap(
-                key,
+                key->key,
                 ad,
                 ad_len * 8,
                 plaintext,
@@ -76,12 +91,12 @@ TEE_Result encrypt_generic(
     }
 
     EMSG("Invalid encryption type: %d", type);
-    return 0;
+    return TEE_ERROR_NOT_SUPPORTED;
 }
 
 TEE_Result decrypt_generic(
     EncryptionType type,
-    const unsigned char *key,
+    key_t *key,
     const unsigned char *ad,
     unsigned int ad_len,
     const unsigned char *ciphertext,
@@ -102,7 +117,7 @@ TEE_Result decrypt_generic(
             );
         case EncryptionType_Spongent:
             return SpongentUnwrap(
-                key,
+                key->key,
                 ad,
                 ad_len * 8,
                 ciphertext,
@@ -115,12 +130,12 @@ TEE_Result decrypt_generic(
     }
 
     EMSG("Invalid encryption type: %d", type);
-    return 0;
+    return TEE_ERROR_NOT_SUPPORTED;
 }
 
 /* AES-related stuff */
 TEE_Result encrypt_aes(
-    const unsigned char *key,
+    key_t *key,
     const unsigned char *ad,
     unsigned int ad_len,
     const unsigned char *plaintext,
@@ -129,23 +144,26 @@ TEE_Result encrypt_aes(
     unsigned char *tag
 ) {
     TEE_Result res;
-	struct aes_cipher sess;
 
     // here we use a zero nonce because we assume nonce is inside associated data
     const unsigned char nonce[NONCE_SIZE] = { 0 };
     unsigned int cipher_len = plaintext_len, tag_len = SECURITY_BYTES;
 
     if(
-        (res = alloc_resources(&sess, TEE_MODE_ENCRYPT)) != TEE_SUCCESS ||
-        (res = set_aes_key(&sess, key)) != TEE_SUCCESS ||
-        (res = reset_aes_iv(&sess, ad, ad_len, nonce, NONCE_SIZE, plaintext_len)) != TEE_SUCCESS
+        (res = reset_operation(
+            key->encrypt_handle,
+            ad,
+            ad_len,
+            nonce,
+            NONCE_SIZE,
+            plaintext_len)
+        ) != TEE_SUCCESS
     ) {
-        clean_session(&sess);
         return res;
     }
 
     res = TEE_AEEncryptFinal(
-        sess.op_handle,
+        key->encrypt_handle,
         plaintext,
         plaintext_len,
         ciphertext,
@@ -153,8 +171,6 @@ TEE_Result encrypt_aes(
         tag,
         &tag_len
     );
-
-    clean_session(&sess);
 
     if(res != TEE_SUCCESS) {
         EMSG("AES encryption failed: %x", res);
@@ -175,7 +191,7 @@ TEE_Result encrypt_aes(
 }
 
 TEE_Result decrypt_aes(
-    const unsigned char *key,
+    key_t *key,
     const unsigned char *ad,
     unsigned int ad_len,
     const unsigned char *ciphertext,
@@ -184,18 +200,21 @@ TEE_Result decrypt_aes(
     const unsigned char *expected_tag
 ) {
     TEE_Result res;
-	struct aes_cipher sess;
 
     // here we use a zero nonce because we assume nonce is inside associated data
     const unsigned char nonce[NONCE_SIZE] = { 0 };
     unsigned int plaintext_len = ciphertext_len;
 
     if(
-        (res = alloc_resources(&sess, TEE_MODE_DECRYPT)) != TEE_SUCCESS ||
-        (res = set_aes_key(&sess, key)) != TEE_SUCCESS ||
-        (res = reset_aes_iv(&sess, ad, ad_len, nonce, NONCE_SIZE, ciphertext_len)) != TEE_SUCCESS
+        (res = reset_operation(
+            key->decrypt_handle,
+            ad,
+            ad_len,
+            nonce,
+            NONCE_SIZE,
+            plaintext_len)
+        ) != TEE_SUCCESS
     ) {
-        clean_session(&sess);
         return res;
     }
 
@@ -204,7 +223,7 @@ TEE_Result decrypt_aes(
 	TEE_MemMove(tag, expected_tag, SECURITY_BYTES);
 
     res = TEE_AEDecryptFinal(
-        sess.op_handle,
+        key->decrypt_handle,
         ciphertext,
         ciphertext_len,
         plaintext,
@@ -212,8 +231,6 @@ TEE_Result decrypt_aes(
         tag,
         SECURITY_BYTES
     );
-
-    clean_session(&sess);
 
     if(res != TEE_SUCCESS) {
         EMSG("AES decryption failed: %x", res);
@@ -228,84 +245,18 @@ TEE_Result decrypt_aes(
     return TEE_SUCCESS;
 }
 
-void clean_session(struct aes_cipher *sess) {
-	if (sess->op_handle != TEE_HANDLE_NULL) {
-		TEE_FreeOperation(sess->op_handle);
-        sess->op_handle = TEE_HANDLE_NULL;
-    }
-
-    if (sess->key_handle != TEE_HANDLE_NULL) {
-		TEE_FreeTransientObject(sess->key_handle);
-        sess->key_handle = TEE_HANDLE_NULL;
-    }
-}
-
-TEE_Result alloc_resources(struct aes_cipher *sess, uint32_t mode) {
-	TEE_Result res;
-
-    // initialize struct
-    sess->op_handle = TEE_HANDLE_NULL;
-    sess->key_handle = TEE_HANDLE_NULL;
-
-	/* Allocate operation: AES/CTR, mode and size from params */
-	res = TEE_AllocateOperation(
-        &sess->op_handle,
-		TEE_ALG_AES_GCM,
-		mode, // either TEE_MODE_ENCRYPT or TEE_MODE_DECRYPT
-		SECURITY_BYTES * 8
-    );
-
-	if (res != TEE_SUCCESS) {
-		EMSG("Failed to allocate operation");
-		return res;
-	}
-
-	/* Allocate transient object according to target key size */
-	res = TEE_AllocateTransientObject(
-        TEE_TYPE_AES,
-		SECURITY_BYTES * 8,
-		&sess->key_handle
-    );
-
-	if (res != TEE_SUCCESS) {
-		EMSG("Failed to allocate transient object");
-		return res;
-	}
-
-	return TEE_SUCCESS;
-}
-
-TEE_Result set_aes_key(struct aes_cipher *sess, const unsigned char *key) {
-	TEE_Attribute attr;
-	TEE_Result res;
-
-	TEE_InitRefAttribute(&attr, TEE_ATTR_SECRET_VALUE, key, SECURITY_BYTES);
-
-	res = TEE_PopulateTransientObject(sess->key_handle, &attr, 1);
-	if (res != TEE_SUCCESS) {
-		EMSG("TEE_PopulateTransientObject failed, %x", res);
-		return res;
-	}
-
-	res = TEE_SetOperationKey(sess->op_handle, sess->key_handle);
-	if (res != TEE_SUCCESS) {
-		EMSG("TEE_SetOperationKey failed %x", res);
-		return res;
-	}
-
-	return TEE_SUCCESS;
-}
-
-TEE_Result reset_aes_iv(
-    struct aes_cipher *sess,
+TEE_Result reset_operation(
+    TEE_OperationHandle op_handle,
     const unsigned char *aad,
     size_t aad_sz,
     const unsigned char *nonce,
     size_t nonce_sz,
     size_t payload_sz
-){
+) {
+    TEE_ResetOperation(op_handle);
+
     TEE_Result res = TEE_AEInit(
-        sess->op_handle,
+        op_handle,
         nonce,
         nonce_sz,
         SECURITY_BYTES * 8, // in bits
@@ -318,6 +269,73 @@ TEE_Result reset_aes_iv(
 		return res;
 	}
 
-	TEE_AEUpdateAAD(sess->op_handle, aad, aad_sz);
+	TEE_AEUpdateAAD(op_handle, aad, aad_sz);
+	return TEE_SUCCESS;
+}
+
+TEE_Result init_aes_key(
+    key_t *key
+) {
+	TEE_Result res;
+	TEE_Attribute attr;
+
+	/* Allocate operations */
+	res = TEE_AllocateOperation(
+        &key->encrypt_handle,
+		TEE_ALG_AES_GCM,
+		TEE_MODE_ENCRYPT,
+		SECURITY_BYTES * 8
+    );
+
+	if (res != TEE_SUCCESS) {
+		EMSG("Failed to allocate encrypt operation");
+		return res;
+	}
+
+    res = TEE_AllocateOperation(
+        &key->decrypt_handle,
+		TEE_ALG_AES_GCM,
+		TEE_MODE_DECRYPT,
+		SECURITY_BYTES * 8
+    );
+
+	if (res != TEE_SUCCESS) {
+		EMSG("Failed to allocate decrypt operation");
+		return res;
+	}
+
+	/* Allocate transient object according to target key size */
+	res = TEE_AllocateTransientObject(
+        TEE_TYPE_AES,
+		SECURITY_BYTES * 8,
+		&key->key_handle
+    );
+
+	if (res != TEE_SUCCESS) {
+		EMSG("Failed to allocate transient object");
+		return res;
+	}
+
+    /* initialize transient object */
+	TEE_InitRefAttribute(&attr, TEE_ATTR_SECRET_VALUE, key->key, SECURITY_BYTES);
+
+	res = TEE_PopulateTransientObject(key->key_handle, &attr, 1);
+	if (res != TEE_SUCCESS) {
+		EMSG("TEE_PopulateTransientObject failed, %x", res);
+		return res;
+	}
+
+	res = TEE_SetOperationKey(key->encrypt_handle, key->key_handle);
+	if (res != TEE_SUCCESS) {
+		EMSG("TEE_SetOperationKey encrypt_handle failed %x", res);
+		return res;
+	}
+
+    res = TEE_SetOperationKey(key->decrypt_handle, key->key_handle);
+	if (res != TEE_SUCCESS) {
+		EMSG("TEE_SetOperationKey decrypt_handle failed %x", res);
+		return res;
+	}
+
 	return TEE_SUCCESS;
 }

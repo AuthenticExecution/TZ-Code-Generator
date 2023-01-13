@@ -18,14 +18,14 @@
 input_t input_funcs[NUM_INPUTS] = { {fill_inputs} };
 entry_t entry_funcs[NUM_ENTRIES] = { {fill_entrys} };
 
-unsigned char module_key[SECURITY_BYTES] = { 0 };
+key_t module_key = { {0}, TEE_HANDLE_NULL, TEE_HANDLE_NULL, TEE_HANDLE_NULL };
 uint16_t current_nonce = 0;
 
-static void measure_time(char *msg) {
+static void measure_time(const char *msg) {
 #ifdef MEASURE_TIME
 	TEE_Time t = {};
 	TEE_GetREETime(&t);
-	DMSG("tz_%s: %lu%06lu us", msg, t.seconds, t.millis * 1000);
+	DMSG("tz_%s: %u%06u us", msg, t.seconds, t.millis * 1000);
 #endif
 }
 
@@ -45,7 +45,7 @@ static TEE_Result retrieve_module_key(void) {
 	// prepare parameters
 	pta_params[0].memref.buffer = &vendor_id;
 	pta_params[0].memref.size = 2;
-	pta_params[1].memref.buffer = module_key;
+	pta_params[1].memref.buffer = module_key.key;
 	pta_params[1].memref.size = SECURITY_BYTES;
 
 	// open session to PTA
@@ -76,6 +76,7 @@ static TEE_Result retrieve_module_key(void) {
 	// close session
 	TEE_CloseTASession(pta_session);
 
+	res = init_key(EncryptionType_Aes, &module_key);
 	return res;
 }
 
@@ -124,12 +125,12 @@ TEE_Result set_key(
 	// decrypt data
 	TEE_Result res = decrypt_generic(
 		EncryptionType_Aes,
-		module_key,
+		&module_key,
 		params[0].memref.buffer,
 		params[0].memref.size,
 		params[1].memref.buffer,
 		params[1].memref.size,
-		connection.connection_key,
+		connection.connection_key.key,
 		params[2].memref.buffer
 	);
 
@@ -143,6 +144,12 @@ TEE_Result set_key(
 	connection.conn_id = (ad[1] << 8) | ad[2];
 	connection.io_id = (ad[3] << 8) | ad[4];
 	connection.nonce = 0;
+
+	res = init_key(connection.encryption, &connection.connection_key);
+	if (res != TEE_SUCCESS) {
+		EMSG("Failed to initialize key: %x", res);
+		return res;
+	}
 
 	DMSG("Adding connection");
 
@@ -200,7 +207,7 @@ TEE_Result disable(
 	// decrypt data
 	TEE_Result res = decrypt_generic(
 		EncryptionType_Aes,
-		module_key,
+		&module_key,
 		params[0].memref.buffer,
 		params[0].memref.size,
 		params[1].memref.buffer,
@@ -264,7 +271,7 @@ TEE_Result attest(
 	// encrypt challenge to compute MAC
 	res = encrypt_generic(
 		EncryptionType_Aes,
-		module_key,
+		&module_key,
 		params[0].memref.buffer,
 		params[0].memref.size,
 		NULL,
@@ -331,7 +338,7 @@ void handle_output(
 		// encrypt payload
 		TEE_Result res = encrypt_generic(
 			conn->encryption,
-			conn->connection_key,
+			&conn->connection_key,
 			(void *) &nonce_rev, // nonce is the associated data
 			2,
 			data_input,
@@ -427,7 +434,7 @@ TEE_Result handle_input(
 	// decrypt data
 	TEE_Result res = decrypt_generic(
 		conn->encryption,
-		conn->connection_key,
+		&conn->connection_key,
 		(void *) &nonce_rev,
 		2,
 		params[2].memref.buffer,
