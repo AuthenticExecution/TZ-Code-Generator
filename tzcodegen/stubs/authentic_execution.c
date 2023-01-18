@@ -21,6 +21,8 @@ entry_t entry_funcs[NUM_ENTRIES] = { {fill_entrys} };
 key_t module_key = { {0}, TEE_HANDLE_NULL, TEE_HANDLE_NULL, TEE_HANDLE_NULL };
 uint16_t current_nonce = 0;
 
+caller_t caller = {NULL, 0};
+
 static void measure_time(const char *msg) {
 #ifdef MEASURE_TIME
 	TEE_Time t = {};
@@ -80,12 +82,9 @@ static TEE_Result retrieve_module_key(void) {
 	return res;
 }
 
-TEE_Result set_key(
-	uint32_t param_types,
-	TEE_Param params[4]
-) {
+TEE_Result set_key(void) {
 	const unsigned int ad_len = 7;
-	const unsigned char *ad = params[0].memref.buffer;
+	const unsigned char *ad = caller.params[0].memref.buffer;
 	const uint32_t exp_param_types = TEE_PARAM_TYPES(
 		TEE_PARAM_TYPE_MEMREF_INPUT,
 		TEE_PARAM_TYPE_MEMREF_INPUT,
@@ -96,20 +95,20 @@ TEE_Result set_key(
 
 	// sanity checks
 	if(
-		param_types != exp_param_types ||
-		params[0].memref.size != ad_len ||
-		params[1].memref.size != SECURITY_BYTES || 
-		params[2].memref.size != SECURITY_BYTES
+		caller.param_types != exp_param_types ||
+		caller.params[0].memref.size != ad_len ||
+		caller.params[1].memref.size != SECURITY_BYTES || 
+		caller.params[2].memref.size != SECURITY_BYTES
 	) {
 		EMSG(
 			"Bad inputs: %d/%d %d/%d %d/%d %d/%d",
-			param_types,
+			caller.param_types,
 			exp_param_types,
-			params[0].memref.size,
+			caller.params[0].memref.size,
 			ad_len,
-			params[1].memref.size,
+			caller.params[1].memref.size,
 			SECURITY_BYTES,
-			params[2].memref.size,
+			caller.params[2].memref.size,
 			SECURITY_BYTES
 		);
 		return TEE_ERROR_BAD_PARAMETERS;
@@ -126,12 +125,12 @@ TEE_Result set_key(
 	TEE_Result res = decrypt_generic(
 		EncryptionType_Aes,
 		&module_key,
-		params[0].memref.buffer,
-		params[0].memref.size,
-		params[1].memref.buffer,
-		params[1].memref.size,
+		caller.params[0].memref.buffer,
+		caller.params[0].memref.size,
+		caller.params[1].memref.buffer,
+		caller.params[1].memref.size,
 		connection.connection_key.key,
-		params[2].memref.buffer
+		caller.params[2].memref.buffer
 	);
 
 	if (res != TEE_SUCCESS) {
@@ -161,12 +160,9 @@ TEE_Result set_key(
 	return TEE_SUCCESS;
 }
 
-TEE_Result disable(
-	uint32_t param_types,
-	TEE_Param params[4]
-) {
+TEE_Result disable(void) {
 	const unsigned int ad_len = 2, cipher_len = 2;
-	const unsigned char *ad = params[0].memref.buffer;
+	const unsigned char *ad = caller.params[0].memref.buffer;
 	const uint32_t exp_param_types = TEE_PARAM_TYPES(
 		TEE_PARAM_TYPE_MEMREF_INPUT,
 		TEE_PARAM_TYPE_MEMREF_INPUT,
@@ -176,20 +172,20 @@ TEE_Result disable(
 
 	// sanity checks
 	if(
-		param_types != exp_param_types ||
-		params[0].memref.size != ad_len ||
-		params[1].memref.size != cipher_len || 
-		params[2].memref.size != SECURITY_BYTES
+		caller.param_types != exp_param_types ||
+		caller.params[0].memref.size != ad_len ||
+		caller.params[1].memref.size != cipher_len || 
+		caller.params[2].memref.size != SECURITY_BYTES
 	) {
 		EMSG(
 			"Bad inputs: %d/%d %d/%d %d/%d %d/%d",
-			param_types,
+			caller.param_types,
 			exp_param_types,
-			params[0].memref.size,
+			caller.params[0].memref.size,
 			ad_len,
-			params[1].memref.size,
+			caller.params[1].memref.size,
 			cipher_len,
-			params[2].memref.size,
+			caller.params[2].memref.size,
 			SECURITY_BYTES
 		);
 		return TEE_ERROR_BAD_PARAMETERS;
@@ -208,12 +204,12 @@ TEE_Result disable(
 	TEE_Result res = decrypt_generic(
 		EncryptionType_Aes,
 		&module_key,
-		params[0].memref.buffer,
-		params[0].memref.size,
-		params[1].memref.buffer,
-		params[1].memref.size,
+		caller.params[0].memref.buffer,
+		caller.params[0].memref.size,
+		caller.params[1].memref.buffer,
+		caller.params[1].memref.size,
 		decrypted_nonce,
-		params[2].memref.buffer
+		caller.params[2].memref.buffer
 	);
 
 	if (res != TEE_SUCCESS) {
@@ -229,10 +225,7 @@ TEE_Result disable(
 	return TEE_SUCCESS;
 }
 
-TEE_Result attest(
-	uint32_t param_types,
-	TEE_Param params[4]
-) {
+TEE_Result attest(void) {
 	const uint32_t exp_param_types = TEE_PARAM_TYPES(
 		TEE_PARAM_TYPE_MEMREF_INPUT,
 		TEE_PARAM_TYPE_MEMREF_OUTPUT,
@@ -242,16 +235,16 @@ TEE_Result attest(
 
 	// sanity checks
 	if(
-		param_types != exp_param_types ||
-		params[0].memref.size <= 0 ||
-		params[1].memref.size != SECURITY_BYTES
+		caller.param_types != exp_param_types ||
+		caller.params[0].memref.size <= 0 ||
+		caller.params[1].memref.size != SECURITY_BYTES
 	) {
 		EMSG(
 			"Bad inputs: %d/%d %d %d/%d",
-			param_types,
+			caller.param_types,
 			exp_param_types,
-			params[0].memref.size,
-			params[1].memref.size,
+			caller.params[0].memref.size,
+			caller.params[1].memref.size,
 			SECURITY_BYTES
 		);
 		return TEE_ERROR_BAD_PARAMETERS;
@@ -272,8 +265,8 @@ TEE_Result attest(
 	res = encrypt_generic(
 		EncryptionType_Aes,
 		&module_key,
-		params[0].memref.buffer,
-		params[0].memref.size,
+		caller.params[0].memref.buffer,
+		caller.params[0].memref.size,
 		NULL,
 		0,
 		NULL,
@@ -281,8 +274,8 @@ TEE_Result attest(
 	);
 
 	if(res == TEE_SUCCESS) {
-		params[1].memref.size = SECURITY_BYTES;
-		TEE_MemMove(params[1].memref.buffer, tag, params[1].memref.size);
+		caller.params[1].memref.size = SECURITY_BYTES;
+		TEE_MemMove(caller.params[1].memref.buffer, tag, caller.params[1].memref.size);
     }
     else {
     	EMSG("MAC generation failed: %x", res);
@@ -293,18 +286,17 @@ TEE_Result attest(
 
 void handle_output(
 	uint16_t output_id,
-    TEE_Param params[4],
 	unsigned char *data_input,
 	uint32_t data_len
 ) {
 	DMSG("Handling output ID %d. Data size: %d", output_id, data_len);
 
-	uint32_t total_data_size = params[0].value.a; // data size so far
-	uint32_t total_outputs = params[0].value.b; // outputs already called so far
+	uint32_t total_data_size = caller.params[0].value.a; // data size so far
+	uint32_t total_outputs = caller.params[0].value.b; // outputs already called so far
 
 	// find offsets in output buffers
-	unsigned char *conn_id_offset = (unsigned char *) params[1].memref.buffer + 2 * total_outputs;
-	unsigned char *payload_offset = (unsigned char *) params[2].memref.buffer + total_data_size;
+	unsigned char *conn_id_offset = (unsigned char *) caller.params[1].memref.buffer + 2 * total_outputs;
+	unsigned char *payload_offset = (unsigned char *) caller.params[2].memref.buffer + total_data_size;
 
 	// iterate over all connections for this output and compute payload+MAC
 	for(
@@ -371,15 +363,12 @@ void handle_output(
 	}
 
 	//update total number of connections and offset
-	params[0].value.a = total_data_size;
-	params[0].value.b = total_outputs;
+	caller.params[0].value.a = total_data_size;
+	caller.params[0].value.b = total_outputs;
 	DMSG("handle_output completed");
 }
 
-TEE_Result handle_input(
-	uint32_t param_types,
-	TEE_Param params[4]
-) {
+TEE_Result handle_input(void) {
 	const uint32_t exp_param_types = TEE_PARAM_TYPES(
 		TEE_PARAM_TYPE_VALUE_INOUT,
 		TEE_PARAM_TYPE_MEMREF_OUTPUT,
@@ -389,27 +378,27 @@ TEE_Result handle_input(
 
 	// sanity checks
 	if(
-		param_types != exp_param_types ||
-		params[1].memref.size < 2 * MAX_CONCURRENT_OUTPUTS || // connection IDs
-		params[2].memref.size < OUTPUT_DATA_MAX_SIZE + SECURITY_BYTES * MAX_CONCURRENT_OUTPUTS || // payloads
-		params[3].memref.size < SECURITY_BYTES // tag
+		caller.param_types != exp_param_types ||
+		caller.params[1].memref.size < 2 * MAX_CONCURRENT_OUTPUTS || // connection IDs
+		caller.params[2].memref.size < OUTPUT_DATA_MAX_SIZE + SECURITY_BYTES * MAX_CONCURRENT_OUTPUTS || // payloads
+		caller.params[3].memref.size < SECURITY_BYTES // tag
 	) {
 		EMSG(
 			"Bad inputs: %d/%d %d/%d %d/%d %d/%d",
-			param_types,
+			caller.param_types,
 			exp_param_types,
-			params[1].memref.size,
+			caller.params[1].memref.size,
 			2 * MAX_CONCURRENT_OUTPUTS,
-			params[2].memref.size,
+			caller.params[2].memref.size,
 			OUTPUT_DATA_MAX_SIZE + SECURITY_BYTES * MAX_CONCURRENT_OUTPUTS,
-			params[3].memref.size,
+			caller.params[3].memref.size,
 			SECURITY_BYTES
 		);
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
-	unsigned int payload_size = params[0].value.a;
-	uint16_t conn_id = params[0].value.b;
+	unsigned int payload_size = caller.params[0].value.a;
+	uint16_t conn_id = caller.params[0].value.b;
 
 	DMSG("Handling input of connection ID: %d", conn_id);
 
@@ -437,10 +426,10 @@ TEE_Result handle_input(
 		&conn->connection_key,
 		(void *) &nonce_rev,
 		2,
-		params[2].memref.buffer,
+		caller.params[2].memref.buffer,
 		payload_size,
 		payload,
-		params[3].memref.buffer
+		caller.params[3].memref.buffer
 	);
 
 	if (res != TEE_SUCCESS) {
@@ -453,13 +442,12 @@ TEE_Result handle_input(
 
 	conn->nonce = conn->nonce + 1;
 	// params[0] is used to store data for possible outputs
-	params[0].value.a = 0;
-	params[0].value.b = 0;
+	caller.params[0].value.a = 0;
+	caller.params[0].value.b = 0;
 	
 	// call input function
 	if(conn->io_id < NUM_INPUTS) {
 		input_funcs[conn->io_id](
-			params,
 			payload,
 			payload_size
 		);
@@ -476,10 +464,7 @@ TEE_Result handle_input(
 	return res;
 }
 
-TEE_Result handle_entry(
-	uint32_t param_types,
-	TEE_Param params[4]
-) {
+TEE_Result handle_entry(void) {
 	const uint32_t exp_param_types = TEE_PARAM_TYPES(
 		TEE_PARAM_TYPE_VALUE_INOUT,
 		TEE_PARAM_TYPE_MEMREF_OUTPUT,
@@ -489,24 +474,24 @@ TEE_Result handle_entry(
 
 	// sanity checks
 	if(
-		param_types != exp_param_types ||
-		params[1].memref.size < 2 * MAX_CONCURRENT_OUTPUTS || // connection IDs
-		params[2].memref.size < OUTPUT_DATA_MAX_SIZE + SECURITY_BYTES * MAX_CONCURRENT_OUTPUTS // payloads
+		caller.param_types != exp_param_types ||
+		caller.params[1].memref.size < 2 * MAX_CONCURRENT_OUTPUTS || // connection IDs
+		caller.params[2].memref.size < OUTPUT_DATA_MAX_SIZE + SECURITY_BYTES * MAX_CONCURRENT_OUTPUTS // payloads
 	) {
 		EMSG(
 			"Bad inputs: %d/%d %d/%d %d/%d",
-			param_types,
+			caller.param_types,
 			exp_param_types,
-			params[1].memref.size,
+			caller.params[1].memref.size,
 			2 * MAX_CONCURRENT_OUTPUTS,
-			params[2].memref.size,
+			caller.params[2].memref.size,
 			OUTPUT_DATA_MAX_SIZE + SECURITY_BYTES * MAX_CONCURRENT_OUTPUTS
 		);
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
-	unsigned int payload_size = params[0].value.a;
-	uint16_t entry_id = params[0].value.b;
+	unsigned int payload_size = caller.params[0].value.a;
+	uint16_t entry_id = caller.params[0].value.b;
 
 	DMSG("Handling custom entry point with ID: %d", entry_id);
 
@@ -516,11 +501,11 @@ TEE_Result handle_entry(
 		EMSG("Failed to allocate payload for entry point");
 		return TEE_ERROR_OUT_OF_MEMORY;
 	}
-	TEE_MemMove(payload, params[2].memref.buffer, payload_size);
+	TEE_MemMove(payload, caller.params[2].memref.buffer, payload_size);
 
 	// params[0] is used to store data for possible outputs
-	params[0].value.a = 0;
-	params[0].value.b = 0;
+	caller.params[0].value.a = 0;
+	caller.params[0].value.b = 0;
 
 	// call entry point
 	TEE_Result res = TEE_SUCCESS;
@@ -529,7 +514,6 @@ TEE_Result handle_entry(
 		entry_id - ENTRY_START_INDEX < NUM_ENTRIES
 	) {
 		entry_funcs[entry_id - ENTRY_START_INDEX](
-			params,
 			payload,
 			payload_size
 		);
@@ -576,22 +560,27 @@ TEE_Result TA_InvokeCommandEntryPoint(
 	uint32_t param_types,
 	TEE_Param params[4]
 ) {
+	// copy params pointer to global variable
+	// so it would not be necessary to propagate it everywhere
+	caller.params = params;
+	caller.param_types = param_types;
+
 	switch (cmd) {
 		case Entry_SetKey:
 			DMSG("Calling set_key");
-			return set_key(param_types, params);
+			return set_key();
 		case Entry_Attest:
 			DMSG("Calling attest");
-			return attest(param_types, params);
+			return attest();
 		case Entry_Disable:
 			DMSG("Calling disable");
-			return disable(param_types, params);
+			return disable();
 		case Entry_HandleInput:
 			DMSG("Calling handle_input");
-			return handle_input(param_types, params);
+			return handle_input();
 		case Entry_UserDefined:
 			DMSG("Calling handle_entry");
-			return handle_entry(param_types, params);
+			return handle_entry();
 		default:
 			EMSG("Command ID %d is not supported", cmd);
 			return TEE_ERROR_NOT_SUPPORTED;
