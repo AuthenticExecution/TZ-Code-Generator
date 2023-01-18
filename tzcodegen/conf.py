@@ -23,8 +23,8 @@ STUB_CONNECTION = "connection.c"
 STUB_CONNECTION_H = "connection.h"
 
 # Starting entrypoint index
-# 0 is set_key, 1 is attest, 2 is handle_input
-START_ENTRY_INDEX = 3
+# 0 is set_key, 1 is attest, 2 is disable, 3 is handle_input
+START_ENTRY_INDEX = 4
 # Starting indexes of inputs, outputs
 # They need to have different indexes, because the `index` field in Connection does
 # not distinguish between them. If the same index is used for different types, bad
